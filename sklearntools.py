@@ -4,7 +4,7 @@ Created on Feb 11, 2016
 @author: jason
 '''
 from sklearn.base import BaseEstimator, clone, MetaEstimatorMixin, is_classifier,\
-    is_regressor
+    is_regressor, TransformerMixin
 import numpy as np
 from sklearn.linear_model.base import LinearRegression
 from sklearn.linear_model.logistic import LogisticRegression
@@ -15,7 +15,81 @@ from sklearn.externals.joblib.parallel import Parallel, delayed
 from cvxpy import Variable, Minimize, Problem
 from cvxpy.settings import OPTIMAL
 
-class QuantileRegressor(object):
+class Packer(BaseEstimator):
+    '''
+    A bit of a hack to get more functionality out of Pipeline.
+    '''
+    
+    def fit(self, X, y=None, sample_weight=None, *args, **kwargs):
+        return self
+    
+    def transform(self, X, y=None, sample_weight=None):
+        if len(X.shape) > 1:
+            n_x = X.shape[1]
+        else:
+            n_x = 1
+        if y is not None and len(y.shape) > 1:
+            n_y = y.shape[1]
+        elif y is not None:
+            n_y = 1
+        else:
+            n_y = 0
+        
+        
+        
+class PackedEstimator(BaseEstimator):
+    '''
+    A bit of a hack to get more functionality out of Pipeline.
+    '''
+
+class Unpacker(BaseEstimator):
+    '''
+    A bit of a hack to get more functionality out of Pipeline.
+    '''
+
+
+class ResponseTransformer(BaseEstimator, TransformerMixin):
+    def __init__(self, base_estimator, fit_on_response_only=True, predict_as_transform=False, 
+                 predict_proba_as_transform=False):
+        self.base_estimator = base_estimator
+        self.fit_on_response_only = fit_on_response_only
+        self.predict_as_transform = predict_as_transform
+        self.predict_proba_as_transform = predict_proba_as_transform
+
+class LogTransformer(BaseEstimator, TransformerMixin):
+    _estimator_type = 'transformer'
+    def __init__(self, offset=None, fixed_offset=1.):
+        self.offset = offset
+        self.fixed_offset = fixed_offset
+    
+    def fit(self, X, y=None):
+        pass
+    
+    def transform(self, X, y=None):
+        pass
+
+class BoxCoxTransformer(BaseEstimator, TransformerMixin):
+    _estimator_type = 'transformer'
+    
+    def fit(self, X, y=None):
+        pass
+    
+    def transform(self, X, y=None):
+        pass
+    
+class VariableImportanceEstimatorCV(BaseEstimator):
+    def __init__(self, estimator, cv=None, scoring=None, score_combiner=None, 
+                 n_jobs=1, verbose=0, pre_dispatch='2*n_jobs'):
+        self.estimator = estimator
+        self.cv = cv
+        self.scoring = scoring
+        self.score_combiner = score_combiner
+        self.n_jobs = n_jobs
+        self.verbose = verbose
+        self.pre_dispatch = pre_dispatch
+
+class QuantileRegressor(BaseEstimator):
+    _estimator_type = 'regressor'
     def __init__(self, q, prevent_crossing=True, lower_bound=None, upper_bound=None):
         self.q = q
         self.prevent_crossing = prevent_crossing
@@ -59,7 +133,7 @@ class QuantileRegressor(object):
         problem.solve()
         if problem.status != OPTIMAL:
             raise ValueError('Problem status is: %s' % problem.status)
-        self.coef_ = np.array([b.value for b in b_vars])
+        self.coef_ = np.array([np.ravel(b.value) for b in b_vars]).T
         return self
     
     def predict(self, X):
@@ -75,6 +149,7 @@ def sim_quantiles(taus, quantiles):
     return y
 
 def test_quantile_regression():
+    np.random.seed(1)
     X = np.random.uniform(0,1,size=(10000,2))
     b = np.array([[0,0],[1,1],[2,2],[4,4],[6,6]]).transpose()
     quantiles = np.dot(X, b)
@@ -82,8 +157,31 @@ def test_quantile_regression():
     y = sim_quantiles(taus, quantiles)
     w = np.ones_like(y)
     qr = QuantileRegressor(taus[1:-1]).fit(X, y, w)
-    assert np.all(np.max(np.abs(np.array(qr.b_vals_).transpose() - b[:, 1:-1])) < .2)
-
+    assert np.max(np.abs(qr.coef_ - b[:, 1:-1]) < .2)
+    pred = qr.predict(X)
+    assert np.max(pred - quantiles[:,1:-1]) < .2
+    
+    # Check for crossing
+    y_hat = qr.predict(X)
+    for i in range(y_hat.shape[1] - 1):
+        assert np.all(y_hat[:,i] <= y_hat[:,i+1])
+    
+    # Test lower bound
+    qr = QuantileRegressor(taus[1:-1], lower_bound=1.).fit(X, y, w)
+    assert np.min(qr.predict(X)) >= 0.9999999999
+    
+    # Test upper bound
+    qr = QuantileRegressor(taus[1:-1], upper_bound=10.).fit(X, y, w)
+    assert np.max(qr.predict(X)) <= 10.00000000001
+    
+    # Test both bounds
+    qr = QuantileRegressor(taus[1:-1], lower_bound=0.5, upper_bound=75.).fit(X, y, w)
+    assert np.min(qr.predict(X)) >= 0.4999999999
+    assert np.max(qr.predict(X)) <= 75.0000000001
+    
+    # Unconstrained
+    qr = QuantileRegressor(taus[1:-1], prevent_crossing=False).fit(X, y, w)
+    
 def weighted_average_score_combine(scores):
     scores_arr = np.array(scores)
     return np.average(scores_arr[0,:], weights=scores_arr[1,:])
@@ -178,7 +276,7 @@ def test_backward_elimination_estimator_cv():
     
     X = np.random.normal(size=(m,n))
     beta = np.random.normal(size=(n,1))
-    y = np.dot(X, beta) + 0.1 * np.random.normal(size=(m, 1))
+    y = np.dot(X, beta) + 0.01 * np.random.normal(size=(m, 1))
     
     target_sequence = np.ravel(np.argsort(beta ** 2, axis=0)[::-1])
     model = BackwardEliminationEstimatorCV(LinearRegression())
@@ -281,7 +379,7 @@ def test_multiple_response_regressor():
 
 
 if __name__ == '__main__':
-    test_quantile_regression
+    test_quantile_regression()
     test_backward_elimination_estimator_cv()
     test_multiple_response_regressor()
     print 'Success!'
