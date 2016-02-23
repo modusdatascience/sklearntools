@@ -14,69 +14,173 @@ from sklearn.externals.joblib.parallel import Parallel, delayed
 
 from cvxpy import Variable, Minimize, Problem
 from cvxpy.settings import OPTIMAL
+# import inspect
+# 
+# class CalibratingEstimator(BaseEstimator):
+#     def __init__(self, estimator, calibrator):
+#         pass
+# 
+# class BaseLearnNode(object):
+#     def __init__(self, estimator, parents, children, pass_through):
+#         self.estimator = estimator
+#         self.parents = parents
+#         self.children = children
+#         self.pass_through = pass_through
+#         
+#     def _init_estimator_methods(self):
+#         self.fit_arg_names, self.fit_var_args, 
+#         self.fit_keywords, self.fit_defaults = inspect.getargspec(self.estimator.fit)
+#         self.predict_arg_names, self.predict_var_args, 
+#         self.predict_keywords, self.predict_defaults = inspect.getargspec(self.estimator.predict)
+#         self.transform_arg_names, self.transform_var_args, 
+#         self.transform_keywords, self.transform_defaults = inspect.getargspec(self.estimator.transform)
+#     
+#     def fit(self, X=None, y=None, sample_weight=None, **kwargs):
+#         pass
+#         
+#         
+# class LearnNode(BaseLearnNode):
+#     def __init__(self, estimator, parents, children, pass_through):
+#         '''
+#         parents : dict {parent_estimator: [(name, ), ...]}
+#         children : dict {method: child_estimators}
+#         '''
+#         super(self, LearnNode).__init__(estimator, parents, children, pass_through)
+#         
+# class InputNode(BaseLearnNode):
+#     def __init__(self, estimator, children, pass_through):
+#         '''
+#         children : dict {method: child_estimators}
+#         '''
+#         super(self, InputNode).__init__(estimator, None, children, pass_through)
+#         
+# class OutputNode(BaseLearnNode):
+#     def __init__(self, estimator, parents, pass_through):
+#         '''
+#         parents : dict {parent_estimator: (names...)}
+#         '''
+#         super(self, OutputNode).__init__(estimator, parents, None)
+#         
+# class LearnGraph(BaseEstimator):
+#     def __init__(self, output_node):
+#         self.output_node = output_node
+#         
+# 
+# def pack(X, y, sample_weight):
+#     return (X, y, sample_weight)
+# #     if len(X.shape) > 1:
+# #         n_x = X.shape[1]
+# #     else:
+# #         n_x = 1
+# #     if y is not None and len(y.shape) > 1:
+# #         n_y = y.shape[1]
+# #     elif y is not None:
+# #         n_y = 1
+# #     else:
+# #         n_y = 0
+# #     if sample_weight is not None and len(sample_weight.shape) > 1:
+# #         n_w = sample_weight.shape[1]
+# #     elif sample_weight is not None:
+# #         n_w = 1
+# #     else:
+# #         n_w = 0
+# #     
+# #     if X.shape[0] > 3:
+# #         result = np.empty(shape=X.shape[0], n_x + n_y + n_w + 1)
+# #         result[0,-1] = n_x
+# #         result[1,-1] = n_y
+# #         result[2,-1] = n_w
+# #         result[:, :n_x] = X
+# #         result[:, n_x:(n_x+n_y)] = y
+# #         result[:, (n_x+n_y):(n_x+n_y+n_w)] = sample_weight
+# #         
+# #     else:
+# #         result = np.empty(shape=X.shape[0], n_x + n_y + n_w + 3)
+# #         result[0,-1] = n_x
+# #         result[0,-2] = n_y
+# #         result[0,-3] = n_w
+# #         result[:, :n_x] = X
+# #         result[:, n_x:(n_x+n_y)] = y
+# #         result[:, (n_x+n_y):(n_x+n_y+n_w)] = sample_weight
+# #     return result
 
-class Packer(BaseEstimator):
-    '''
-    A bit of a hack to get more functionality out of Pipeline.
-    '''
-    
-    def fit(self, X, y=None, sample_weight=None, *args, **kwargs):
+#     
+# 
+# class Packer(BaseEstimator):
+#     '''
+#     A bit of a hack to get more functionality out of Pipeline.
+#     '''
+#     
+#     def fit(self, X, y=None, sample_weight=None, *args, **kwargs):
+#         return self
+#     
+#     def transform(self, X, y=None, sample_weight=None):
+#         return pack(X, y, sample_weight)
+#         
+# class PackedEstimator(BaseEstimator):
+#     '''
+#     A bit of a hack to get more functionality out of Pipeline.
+#     '''
+#     def __init__(self, estimator):
+#         self.estimator = estimator
+#         
+#     def fit(self, X, y=None, *args, **kwargs):
+#         X, y, sample_weight = X
+#         self.estimator_ = clone(self.estimator).fit(X, y, *args, **kwargs)
+# #         self.
+# 
+# class Unpacker(BaseEstimator):
+#     '''
+#     A bit of a hack to get more functionality out of Pipeline.
+#     '''
+class IdentityTransformer(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        pass
+     
+    def fit(self, X, y=None, sample_weight=None):
+        pass
+     
+    def transform(self, X, y=None):
+        return X
+
+class ResponseTransformingEstimator(BaseEstimator, TransformerMixin):
+    def __init__(self, estimator, transformer, inverter=IdentityTransformer()):
+        self.estimator = estimator
+        self.transformer = transformer
+        self.inverter = inverter
+        
+    def fit(self, X, y, transformer_args, estimator_args, inverter_args):
+        self.transformer_ = clone(self.transformer).fit(y, **transformer_args)
+        y_transformed = self.transformer_.transform(y)
+        self.estimator_ = clone(self.estimator).fit(X, y_transformed, **estimator_args)
+        y_predicted = self.estimator_.predict(X)
+        self.inverter_ = clone(self.inverter).fit(y_predicted, y)
         return self
     
-    def transform(self, X, y=None, sample_weight=None):
-        if len(X.shape) > 1:
-            n_x = X.shape[1]
-        else:
-            n_x = 1
-        if y is not None and len(y.shape) > 1:
-            n_y = y.shape[1]
-        elif y is not None:
-            n_y = 1
-        else:
-            n_y = 0
+    def predict(self, X, transformer_args, estimator_args, inverter_args):
+        return self.inverter_.transform(self.estimator_.predict(X))
         
-        
-        
-class PackedEstimator(BaseEstimator):
-    '''
-    A bit of a hack to get more functionality out of Pipeline.
-    '''
-
-class Unpacker(BaseEstimator):
-    '''
-    A bit of a hack to get more functionality out of Pipeline.
-    '''
-
-
-class ResponseTransformer(BaseEstimator, TransformerMixin):
-    def __init__(self, base_estimator, fit_on_response_only=True, predict_as_transform=False, 
-                 predict_proba_as_transform=False):
-        self.base_estimator = base_estimator
-        self.fit_on_response_only = fit_on_response_only
-        self.predict_as_transform = predict_as_transform
-        self.predict_proba_as_transform = predict_proba_as_transform
-
-class LogTransformer(BaseEstimator, TransformerMixin):
-    _estimator_type = 'transformer'
-    def __init__(self, offset=None, fixed_offset=1.):
-        self.offset = offset
-        self.fixed_offset = fixed_offset
-    
-    def fit(self, X, y=None):
-        pass
-    
-    def transform(self, X, y=None):
-        pass
-
-class BoxCoxTransformer(BaseEstimator, TransformerMixin):
-    _estimator_type = 'transformer'
-    
-    def fit(self, X, y=None):
-        pass
-    
-    def transform(self, X, y=None):
-        pass
-    
+# class LogTransformer(BaseEstimator, TransformerMixin):
+#     _estimator_type = 'transformer'
+#     def __init__(self, offset=None, fixed_offset=1.):
+#         self.offset = offset
+#         self.fixed_offset = fixed_offset
+#     
+#     def fit(self, X, y=None):
+#         pass
+#     
+#     def transform(self, X, y=None):
+#         pass
+# 
+# class BoxCoxTransformer(BaseEstimator, TransformerMixin):
+#     _estimator_type = 'transformer'
+#     
+#     def fit(self, X, y=None):
+#         pass
+#     
+#     def transform(self, X, y=None):
+#         pass
+#     
 class VariableImportanceEstimatorCV(BaseEstimator):
     def __init__(self, estimator, cv=None, scoring=None, score_combiner=None, 
                  n_jobs=1, verbose=0, pre_dispatch='2*n_jobs'):
