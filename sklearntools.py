@@ -18,6 +18,11 @@ from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.utils.validation import check_X_y
 import warnings
 from sklearn.utils import safe_sqr
+
+
+
+
+
 # import inspect
 # 
 # class CalibratingEstimator(BaseEstimator):
@@ -314,7 +319,7 @@ def check_score_combiner(estimator, score_combiner):
     else:
         raise NotImplementedError('Score combiner %s not implemented' % str(score_combiner))
 
-class FeatureImportanceEstimatorCV(STSimpleEstimator):
+class FeatureImportanceEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
     def __init__(self, estimator, cv=None, scoring=None, score_combiner=None, 
                  n_jobs=1, verbose=0, pre_dispatch='2*n_jobs'):
         self.estimator = estimator
@@ -336,7 +341,14 @@ class FeatureImportanceEstimatorCV(STSimpleEstimator):
         parallel = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
                         pre_dispatch=self.pre_dispatch)
         n_features = X.shape[1]
-        feature_importances = []
+        feature_deletion_scores = []
+        
+#         # Get cross-validated scores with all features present
+#         scores = parallel(delayed(_fit_and_score)(clone(self.estimator), X, y, scorer,
+#                                       train, test, self.verbose, None,
+#                                       kwargs)
+#                               for train, test in cv)
+#         all_features_score = combiner(scores)
         
         # For each feature, remove that feature and get the cross-validation scores
         for col in range(n_features):
@@ -350,10 +362,15 @@ class FeatureImportanceEstimatorCV(STSimpleEstimator):
                                       kwargs)
                               for train, test in cv)
             score = combiner(scores)
-            feature_importances.append(score)
-        self.feature_importances_ = np.array(feature_importances)
+            feature_deletion_scores.append(score)
         
-        # Finally, fit on the full data set with the selected set of features
+        # Higher scores are better.  Higher feature importance means the feature is more important, 
+        # and feature importances should add to 1.  This code reconciles these facts.  Note that this 
+        # method guarantees that the least important feature has zero importance.
+        self.feature_importances_ = max(feature_deletion_scores) - np.array(feature_deletion_scores)
+        self.feature_importances_ /= np.sum(self.feature_importances_)
+        
+        # Finally, fit on the full data set
         self.estimator_ = clone(self.estimator).fit(X, y, **kwargs)
     
     def predict(self, X, *args, **kwargs):
@@ -571,13 +588,22 @@ class STSelector(STSimpleEstimator, SelectorMixin, MetaEstimatorMixin, Transform
 #             raise IndexError('X does not have the right number of columns')
 #         
 
+
+# def check_chooser(chooser):
+#     if chooser is None:
+#         return BestImportanceChooser()
+#     if hasattr(chooser, 'update') and hasattr(chooser, 'choose'):
+#         return chooser
+#     
+
 class BackwardEliminationEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
-    def __init__(self, estimator, cv=None, scoring=None, score_combiner=None, 
-                 n_jobs=1, verbose=0, pre_dispatch='2*n_jobs'):
+    def __init__(self, estimator, cv=None, scoring=None, score_combining=None, 
+                 choosing=None, n_jobs=1, verbose=0, pre_dispatch='2*n_jobs'):
         self.estimator = estimator
         self.cv = cv
         self.scoring = scoring
-        self.score_combiner = score_combiner
+        self.score_combining = score_combining
+        self.choosing = choosing
         self.n_jobs = n_jobs
         self.verbose = verbose
         self.pre_dispatch = pre_dispatch
@@ -592,7 +618,7 @@ class BackwardEliminationEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
     def fit(self, X, y, **kwargs):
         cv = check_cv(self.cv, X=X, y=y, classifier=is_classifier(self.estimator))
         scorer = check_scoring(self.estimator, scoring=self.scoring)
-        combiner = check_score_combiner(self.estimator, self.score_combiner)
+        combiner = check_score_combiner(self.estimator, self.score_combining)
         parallel = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
                         pre_dispatch=self.pre_dispatch)
         n_features = X.shape[1]

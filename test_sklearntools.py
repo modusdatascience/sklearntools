@@ -5,7 +5,7 @@ Created on Feb 23, 2016
 '''
 import numpy as np
 from sklearntools import QuantileRegressor, BackwardEliminationEstimatorCV,\
-    MultipleResponseEstimator, ProbaPredictingEstimator
+    MultipleResponseEstimator, ProbaPredictingEstimator, FeatureImportanceEstimatorCV
 from sklearn.linear_model.base import LinearRegression
 from sklearn.linear_model.logistic import LogisticRegression
 
@@ -52,15 +52,36 @@ def test_quantile_regression():
     
     # Unconstrained
     qr = QuantileRegressor(taus[1:-1], prevent_crossing=False).fit(X, y, w)
-    
-def test_backward_elimination_estimation():
-    np.random.seed(1)
+
+def test_feature_importance_estimator_cv():
+    np.random.seed(0)
     m = 100000
-    n = 10
-    factor = .75
+    n = 6
+    factor = .9
     
     X = np.random.normal(size=(m,n))
-    beta = 10 * np.ones(shape=n)
+    beta = 100 * np.ones(shape=n)
+    for i in range(1, n):
+        beta[i] = factor * beta[i-1]
+    beta = np.random.permutation(beta)[:,None]
+    
+    y = np.dot(X, beta) + 0.01 * np.random.normal(size=(m, 1))
+    
+    target_sequence = np.ravel(np.argsort(beta ** 2, axis=0))
+    model1 = FeatureImportanceEstimatorCV(LinearRegression())
+    model1.fit(X, y)
+    fitted_sequence = np.ravel(np.argsort(model1.feature_importances_, axis=0))
+    
+    np.testing.assert_array_equal(fitted_sequence, target_sequence)
+    
+def test_backward_elimination_estimation():
+    np.random.seed(0)
+    m = 100000
+    n = 6
+    factor = .9
+    
+    X = np.random.normal(size=(m,n))
+    beta = 100 * np.ones(shape=n)
     for i in range(1, n):
         beta[i] = factor * beta[i-1]
     beta = np.random.permutation(beta)[:,None]
@@ -103,6 +124,7 @@ def test_multiple_response_regressor():
 
 if __name__ == '__main__':
     test_quantile_regression()
+    test_feature_importance_estimator_cv()
     test_backward_elimination_estimation()
     test_multiple_response_regressor()
     print 'Success!'
