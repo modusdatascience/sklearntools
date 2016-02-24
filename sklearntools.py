@@ -6,14 +6,18 @@ Created on Feb 11, 2016
 from sklearn.base import BaseEstimator, clone, MetaEstimatorMixin, is_classifier,\
     is_regressor, TransformerMixin
 import numpy as np
-from sklearn.linear_model.base import LinearRegression
-from sklearn.linear_model.logistic import LogisticRegression
 from sklearn.cross_validation import check_cv, _fit_and_score
 from sklearn.metrics.scorer import check_scoring
 from sklearn.externals.joblib.parallel import Parallel, delayed
 
 from cvxpy import Variable, Minimize, Problem
 from cvxpy.settings import OPTIMAL
+from sklearn.pipeline import Pipeline
+from sklearn.feature_selection.base import SelectorMixin
+from sklearn.utils.metaestimators import if_delegate_has_method
+from sklearn.utils.validation import check_X_y
+import warnings
+from sklearn.utils import safe_sqr
 # import inspect
 # 
 # class CalibratingEstimator(BaseEstimator):
@@ -133,7 +137,71 @@ from cvxpy.settings import OPTIMAL
 #     '''
 #     A bit of a hack to get more functionality out of Pipeline.
 #     '''
-class IdentityTransformer(BaseEstimator, TransformerMixin):
+class SklearnTool(object):
+    pass
+
+class STEstimator(BaseEstimator, SklearnTool):
+    def _get_steps(self, other):
+        if isinstance(other, Pipeline):
+            steps = [step for step in other.steps]
+            
+        else:
+            other_name = other.__class__.__name__
+            steps = [(other_name, other)]
+        return steps
+    
+    def _get_name(self, steps):
+        step_names = set([step[0] for step in steps])
+        self_class_name = self.__class__.__name__
+        self_name = self_class_name
+        i = 2
+        while True:
+            if self_name in step_names:
+                self_name = self_class_name + '_' + str(i)
+            else:
+                break
+            i += 1
+            if i > 1e6:
+                raise ValueError('Unable to name estimator %s in pipeline' % str(self))
+        return self_name, steps
+
+class STSimpleEstimator(STEstimator):
+    def __or__(self, other):
+        '''
+        self | other
+        '''
+        steps = self._get_steps(other)
+        self_name = self._get_name(steps)
+        steps = [(self_name, self)] + steps
+        return STPipeline(steps)
+        
+    def __ror__(self, other):
+        '''
+        other | self
+        '''
+        steps = self._get_steps(other)
+        self_name = self._get_name(steps)
+        steps = steps + [(self_name, self)]
+        return STPipeline(steps)
+
+class STPipeline(STEstimator, Pipeline):
+    def __or__(self, other):
+        '''
+        self | other
+        '''
+        other_steps = self._get_steps(other)
+        steps = self.steps + other_steps
+        return STPipeline(steps)
+        
+    def __ror__(self, other):
+        '''
+        other | self
+        '''
+        other_steps = self._get_steps(other)
+        steps = other_steps + self.steps
+        return STPipeline(steps)
+
+class IdentityTransformer(STSimpleEstimator, TransformerMixin):
     def __init__(self):
         pass
      
@@ -143,7 +211,7 @@ class IdentityTransformer(BaseEstimator, TransformerMixin):
     def transform(self, X, y=None):
         return X
 
-class ResponseTransformingEstimator(BaseEstimator, TransformerMixin):
+class ResponseTransformingEstimator(STSimpleEstimator, TransformerMixin):
     def __init__(self, estimator, transformer, inverter=IdentityTransformer()):
         self.estimator = estimator
         self.transformer = transformer
@@ -181,18 +249,9 @@ class ResponseTransformingEstimator(BaseEstimator, TransformerMixin):
 #     def transform(self, X, y=None):
 #         pass
 #     
-class VariableImportanceEstimatorCV(BaseEstimator):
-    def __init__(self, estimator, cv=None, scoring=None, score_combiner=None, 
-                 n_jobs=1, verbose=0, pre_dispatch='2*n_jobs'):
-        self.estimator = estimator
-        self.cv = cv
-        self.scoring = scoring
-        self.score_combiner = score_combiner
-        self.n_jobs = n_jobs
-        self.verbose = verbose
-        self.pre_dispatch = pre_dispatch
 
-class QuantileRegressor(BaseEstimator):
+
+class QuantileRegressor(STSimpleEstimator):
     _estimator_type = 'regressor'
     def __init__(self, q, prevent_crossing=True, lower_bound=None, upper_bound=None):
         self.q = q
@@ -243,52 +302,11 @@ class QuantileRegressor(BaseEstimator):
     def predict(self, X):
         return np.dot(X, self.coef_)
 
-def sim_quantiles(taus, quantiles):
-    assert quantiles.shape[1] == len(taus)
-    p_vals = np.array([taus[i] - taus[i-1] for i in range(1,len(taus))])
-    choices = np.random.multinomial(1, p_vals, size=quantiles.shape[0])
-    lowers = quantiles[:, :-1][choices==1]
-    uppers = quantiles[:, 1:][choices==1]
-    y = np.random.uniform(low=lowers, high=uppers)
-    return y
 
-def test_quantile_regression():
-    np.random.seed(1)
-    X = np.random.uniform(0,1,size=(10000,2))
-    b = np.array([[0,0],[1,1],[2,2],[4,4],[6,6]]).transpose()
-    quantiles = np.dot(X, b)
-    taus = np.array([0.,.1,.5,.9,1.])
-    y = sim_quantiles(taus, quantiles)
-    w = np.ones_like(y)
-    qr = QuantileRegressor(taus[1:-1]).fit(X, y, w)
-    assert np.max(np.abs(qr.coef_ - b[:, 1:-1]) < .2)
-    pred = qr.predict(X)
-    assert np.max(pred - quantiles[:,1:-1]) < .2
-    
-    # Check for crossing
-    y_hat = qr.predict(X)
-    for i in range(y_hat.shape[1] - 1):
-        assert np.all(y_hat[:,i] <= y_hat[:,i+1])
-    
-    # Test lower bound
-    qr = QuantileRegressor(taus[1:-1], lower_bound=1.).fit(X, y, w)
-    assert np.min(qr.predict(X)) >= 0.9999999999
-    
-    # Test upper bound
-    qr = QuantileRegressor(taus[1:-1], upper_bound=10.).fit(X, y, w)
-    assert np.max(qr.predict(X)) <= 10.00000000001
-    
-    # Test both bounds
-    qr = QuantileRegressor(taus[1:-1], lower_bound=0.5, upper_bound=75.).fit(X, y, w)
-    assert np.min(qr.predict(X)) >= 0.4999999999
-    assert np.max(qr.predict(X)) <= 75.0000000001
-    
-    # Unconstrained
-    qr = QuantileRegressor(taus[1:-1], prevent_crossing=False).fit(X, y, w)
     
 def weighted_average_score_combine(scores):
     scores_arr = np.array(scores)
-    return np.average(scores_arr[0,:], weights=scores_arr[1,:])
+    return np.average(scores_arr[0,:], weights=scores_arr[:,1])
     
 def check_score_combiner(estimator, score_combiner):
     if score_combiner is None:
@@ -296,7 +314,7 @@ def check_score_combiner(estimator, score_combiner):
     else:
         raise NotImplementedError('Score combiner %s not implemented' % str(score_combiner))
 
-class BackwardEliminationEstimatorCV(BaseEstimator, MetaEstimatorMixin):
+class FeatureImportanceEstimatorCV(STSimpleEstimator):
     def __init__(self, estimator, cv=None, scoring=None, score_combiner=None, 
                  n_jobs=1, verbose=0, pre_dispatch='2*n_jobs'):
         self.estimator = estimator
@@ -306,7 +324,267 @@ class BackwardEliminationEstimatorCV(BaseEstimator, MetaEstimatorMixin):
         self.n_jobs = n_jobs
         self.verbose = verbose
         self.pre_dispatch = pre_dispatch
+    
+    @property
+    def _estimator_type(self):
+        return self.estimator._estimator_type
+    
+    def fit(self, X, y, **kwargs):
+        cv = check_cv(self.cv, X=X, y=y, classifier=is_classifier(self.estimator))
+        scorer = check_scoring(self.estimator, scoring=self.scoring)
+        combiner = check_score_combiner(self.estimator, self.score_combiner)
+        parallel = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
+                        pre_dispatch=self.pre_dispatch)
+        n_features = X.shape[1]
+        feature_importances = []
         
+        # For each feature, remove that feature and get the cross-validation scores
+        for col in range(n_features):
+            test_features = np.ones(shape=n_features, dtype=bool)
+            
+            if n_features > 1:
+                test_features[col] = False
+            
+            scores = parallel(delayed(_fit_and_score)(clone(self.estimator), X[:, test_features], y, scorer,
+                                      train, test, self.verbose, None,
+                                      kwargs)
+                              for train, test in cv)
+            score = combiner(scores)
+            feature_importances.append(score)
+        self.feature_importances_ = np.array(feature_importances)
+        
+        # Finally, fit on the full data set with the selected set of features
+        self.estimator_ = clone(self.estimator).fit(X, y, **kwargs)
+    
+    def predict(self, X, *args, **kwargs):
+        return self.estimator_.predict(X, *args, **kwargs)
+
+class STSelector(STSimpleEstimator, SelectorMixin, MetaEstimatorMixin, TransformerMixin):
+    @if_delegate_has_method(delegate='estimator')
+    def predict(self, X):
+        """Reduce X to the selected features and then predict using the
+           underlying estimator.
+
+        Parameters
+        ----------
+        X : array of shape [n_samples, n_features]
+            The input samples.
+
+        Returns
+        -------
+        y : array of shape [n_samples]
+            The predicted target values.
+        """
+        return self.estimator_.predict(self.transform(X))
+
+    @if_delegate_has_method(delegate='estimator')
+    def score(self, X, y):
+        """Reduce X to the selected features and then return the score of the
+           underlying estimator.
+
+        Parameters
+        ----------
+        X : array of shape [n_samples, n_features]
+            The input samples.
+
+        y : array of shape [n_samples]
+            The target values.
+        """
+        return self.estimator_.score(self.transform(X), y)
+    
+    def _get_support_mask(self):
+        return self.support_
+    
+    @property
+    def _estimator_type(self):
+        return self.estimator._estimator_type
+
+    @if_delegate_has_method(delegate='estimator')
+    def decision_function(self, X):
+        return self.estimator_.decision_function(self.transform(X))
+
+    @if_delegate_has_method(delegate='estimator')
+    def predict_proba(self, X):
+        return self.estimator_.predict_proba(self.transform(X))
+
+    @if_delegate_has_method(delegate='estimator')
+    def predict_log_proba(self, X):
+        return self.estimator_.predict_log_proba(self.transform(X))
+
+# class RFE(STSelector):
+#     def __init__(self, estimator, n_features_to_select=None, step=1,
+#                  estimator_params=None, verbose=0):
+#         self.estimator = estimator
+#         self.n_features_to_select = n_features_to_select
+#         self.step = step
+#         self.estimator_params = estimator_params
+#         self.verbose = verbose
+#         
+#     def fit(self, X, y):
+#         """Fit the RFE model and then the underlying estimator on the selected
+#            features.
+# 
+#         Parameters
+#         ----------
+#         X : {array-like, sparse matrix}, shape = [n_samples, n_features]
+#             The training input samples.
+# 
+#         y : array-like, shape = [n_samples]
+#             The target values.
+#         """
+#         return self._fit(X, y)
+#     
+#     def _fit(self, X, y, step_score=None):
+#         X, y = check_X_y(X, y, "csc", multi_output=True)
+#         # Initialization
+#         n_features = X.shape[1]
+#         if self.n_features_to_select is None:
+#             n_features_to_select = n_features // 2
+#         else:
+#             n_features_to_select = self.n_features_to_select
+# 
+#         if 0.0 < self.step < 1.0:
+#             step = int(max(1, self.step * n_features))
+#         else:
+#             step = int(self.step)
+#         if step <= 0:
+#             raise ValueError("Step must be >0")
+# 
+#         if self.estimator_params is not None:
+#             warnings.warn("The parameter 'estimator_params' is deprecated as "
+#                           "of version 0.16 and will be removed in 0.18. The "
+#                           "parameter is no longer necessary because the value "
+#                           "is set via the estimator initialisation or "
+#                           "set_params method.", DeprecationWarning)
+# 
+#         support_ = np.ones(n_features, dtype=np.bool)
+#         ranking_ = np.ones(n_features, dtype=np.int)
+# 
+#         if step_score:
+#             self.scores_ = []
+# 
+#         # Elimination
+#         while np.sum(support_) > n_features_to_select:
+#             # Remaining features
+#             features = np.arange(n_features)[support_]
+# 
+#             # Rank the remaining features
+#             estimator = clone(self.estimator)
+#             if self.estimator_params:
+#                 estimator.set_params(**self.estimator_params)
+#             if self.verbose > 0:
+#                 print("Fitting estimator with %d features." % np.sum(support_))
+# 
+#             estimator.fit(X[:, features], y)
+# 
+#             # Get coefs
+#             if hasattr(estimator, 'coef_'):
+#                 coefs = estimator.coef_
+#             elif hasattr(estimator, 'feature_importances_'):
+#                 coefs = estimator.feature_importances_
+#             else:
+#                 raise RuntimeError('The classifier does not expose '
+#                                    '"coef_" or "feature_importances_" '
+#                                    'attributes')
+# 
+#             # Get ranks
+#             if coefs.ndim > 1:
+#                 ranks = np.argsort(safe_sqr(coefs).sum(axis=0))
+#             else:
+#                 ranks = np.argsort(safe_sqr(coefs))
+# 
+#             # for sparse case ranks is matrix
+#             ranks = np.ravel(ranks)
+# 
+#             # Eliminate the worse features
+#             threshold = min(step, np.sum(support_) - n_features_to_select)
+# 
+#             # Compute step score on the previous selection iteration
+#             # because 'estimator' must use features
+#             # that have not been eliminated yet
+#             if step_score:
+#                 self.scores_.append(step_score(estimator, features))
+#             try:
+#                 support_[features[ranks][:threshold]] = False
+#             except:
+#                 support_[features[ranks][:threshold]] = False
+#             ranking_[np.logical_not(support_)] += 1
+# 
+#         # Set final attributes
+#         features = np.arange(n_features)[support_]
+#         self.estimator_ = clone(self.estimator)
+#         if self.estimator_params:
+#             self.estimator_.set_params(**self.estimator_params)
+#         self.estimator_.fit(X[:, features], y)
+# 
+#         # Compute step score when only n_features_to_select features left
+#         if step_score:
+#             self.scores_.append(step_score(self.estimator_, features))
+#         self.n_features_ = support_.sum()
+#         self.support_ = support_
+#         self.ranking_ = ranking_
+# 
+#         return self
+# 
+# class BRFE(STSelector):
+#     '''
+#     Performs recursive feature elimination, but chooses the best set of features
+#     instead of just pruning to a pre-selected number.
+#     '''
+#     def __init__(self, estimator, min_features_to_select=1, step=1,
+#                  verbose=0):
+#         self.estimator = estimator
+#         self.min_features_to_select = min_features_to_select
+#         self.step = step
+#         self.verbose = verbose
+#     
+#     def fit(self, X, y, *args, **kwargs):
+#         # Fit the RFE, which is most of the work
+#         rfe = RFE(clone(self.estimator), self.min_features_to_select,
+#                               self.step, self.verbose)
+#         rfe.fit(X, y, *args, **kwargs)
+#         
+#         # Find the best scoring step from the RFE
+#         best_score = float('-inf')
+#         best_idx = None
+#         for i, score in enumerate(rfe.scores_):
+#             if score >= best_score:
+#                 best_score = score
+#                 best_idx = i
+#                 
+#         # Calculate the mask for that step
+#         thresh = len(rfe.scores_ - best_idx)
+#         mask = rfe.ranking_ <= thresh
+#         
+#         # Set fitted attributes
+#         self.support_ = mask
+#         self.n_input_features_ = np.sum(self.support_)
+#         self.rfe_ = rfe
+#         self.self.estimator_ = clone(self.estimator).fit(X[:, self.support_], y, **kwargs)
+#         
+#     def predict(self, X, **kwargs):
+#         if X.shape[1] == self.n_input_features_:
+#             return self.estimator_.predict(X[:, self.support_], **kwargs)
+#         elif X.shape[1] == self.n_features_:
+#             return self.estimator_.predict(X, **kwargs)
+#         else:
+#             raise IndexError('X does not have the right number of columns')
+#         
+
+class BackwardEliminationEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
+    def __init__(self, estimator, cv=None, scoring=None, score_combiner=None, 
+                 n_jobs=1, verbose=0, pre_dispatch='2*n_jobs'):
+        self.estimator = estimator
+        self.cv = cv
+        self.scoring = scoring
+        self.score_combiner = score_combiner
+        self.n_jobs = n_jobs
+        self.verbose = verbose
+        self.pre_dispatch = pre_dispatch
+    
+    def _get_support_mask(self):
+        return self.support_
+    
     @property
     def _estimator_type(self):
         return self.estimator._estimator_type
@@ -365,30 +643,16 @@ class BackwardEliminationEstimatorCV(BaseEstimator, MetaEstimatorMixin):
         
         return self
 
-    def predict(self, X, **kwargs):
-        if X.shape[1] == self.n_input_features_:
-            return self.estimator_.predict(X[:, self.support_], **kwargs)
-        elif X.shape[1] == self.n_features_:
-            return self.estimator_.predict(X, **kwargs)
-        else:
-            raise IndexError('X does not have the right number of columns')
+#     def predict(self, X, **kwargs):
+#         if X.shape[1] == self.n_input_features_:
+#             return self.estimator_.predict(X[:, self.support_], **kwargs)
+#         elif X.shape[1] == self.n_features_:
+#             return self.estimator_.predict(X, **kwargs)
+#         else:
+#             raise IndexError('X does not have the right number of columns')
 
-def test_backward_elimination_estimator_cv():
-    np.random.seed(1)
-    m = 100000
-    n = 10
-    
-    X = np.random.normal(size=(m,n))
-    beta = np.random.normal(size=(n,1))
-    y = np.dot(X, beta) + 0.01 * np.random.normal(size=(m, 1))
-    
-    target_sequence = np.ravel(np.argsort(beta ** 2, axis=0)[::-1])
-    model = BackwardEliminationEstimatorCV(LinearRegression())
-    model.fit(X, y)
-    np.testing.assert_array_equal(model.elimination_sequence_, target_sequence[:-1])
-    
 
-class MultipleResponseEstimator(BaseEstimator, MetaEstimatorMixin):
+class MultipleResponseEstimator(STSimpleEstimator, MetaEstimatorMixin):
     def __init__(self, base_estimators):
         self.base_estimators = base_estimators
         
@@ -444,7 +708,7 @@ class MultipleResponseEstimator(BaseEstimator, MetaEstimatorMixin):
         return np.concatenate(predictions, axis=1)
     
     
-class ProbaPredictingEstimator(BaseEstimator, MetaEstimatorMixin):
+class ProbaPredictingEstimator(STSimpleEstimator, MetaEstimatorMixin):
     def __init__(self, base_estimator):
         self.base_estimator = base_estimator
     
@@ -455,37 +719,4 @@ class ProbaPredictingEstimator(BaseEstimator, MetaEstimatorMixin):
     
     def predict(self, X, *args, **kwargs):
         return self.estimator_.predict_proba(X, *args, **kwargs)
-    
-    
-def test_multiple_response_regressor():
-    np.random.seed(1)
-    m = 100000
-    n = 10
-    
-    X = np.random.normal(size=(m,n))
-    beta1 = np.random.normal(size=(n,1))
-    beta2 = np.random.normal(size=(n,1))
-        
-    y1 = np.dot(X, beta1)
-    p2 = 1. / (1. + np.exp( - np.dot(X, beta2)))
-    y2 = np.random.binomial(n=1, p=p2)
-    y = np.concatenate([y1, y2], axis=1)
-        
-    model = MultipleResponseEstimator([('linear', np.array([True, False], dtype=bool), LinearRegression()), 
-                                       ('logistic', np.array([False, True], dtype=bool), ProbaPredictingEstimator(LogisticRegression()))])
-    model.fit(X, y)
-    
-    assert np.mean(beta1 - model.estimators_dict_['linear'][1].coef_) < .01
-    assert np.mean(beta2 - model.estimators_dict_['logistic'][1].estimator_.coef_) < .01
-    assert model.prediction_columns_ == ['linear', 'logistic', 'logistic']
-    model.get_params()
-    model.predict(X)
 
-
-if __name__ == '__main__':
-    test_quantile_regression()
-    test_backward_elimination_estimator_cv()
-    test_multiple_response_regressor()
-    print 'Success!'
-    
-    
