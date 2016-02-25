@@ -9,139 +9,13 @@ import numpy as np
 from sklearn.cross_validation import check_cv, _fit_and_score
 from sklearn.metrics.scorer import check_scoring
 from sklearn.externals.joblib.parallel import Parallel, delayed
-
 from cvxpy import Variable, Minimize, Problem
 from cvxpy.settings import OPTIMAL
 from sklearn.pipeline import Pipeline
 from sklearn.feature_selection.base import SelectorMixin
 from sklearn.utils.metaestimators import if_delegate_has_method
-from sklearn.utils.validation import check_X_y
-import warnings
-from sklearn.utils import safe_sqr
-
-
-
-
-
-# import inspect
-# 
-# class CalibratingEstimator(BaseEstimator):
-#     def __init__(self, estimator, calibrator):
-#         pass
-# 
-# class BaseLearnNode(object):
-#     def __init__(self, estimator, parents, children, pass_through):
-#         self.estimator = estimator
-#         self.parents = parents
-#         self.children = children
-#         self.pass_through = pass_through
-#         
-#     def _init_estimator_methods(self):
-#         self.fit_arg_names, self.fit_var_args, 
-#         self.fit_keywords, self.fit_defaults = inspect.getargspec(self.estimator.fit)
-#         self.predict_arg_names, self.predict_var_args, 
-#         self.predict_keywords, self.predict_defaults = inspect.getargspec(self.estimator.predict)
-#         self.transform_arg_names, self.transform_var_args, 
-#         self.transform_keywords, self.transform_defaults = inspect.getargspec(self.estimator.transform)
-#     
-#     def fit(self, X=None, y=None, sample_weight=None, **kwargs):
-#         pass
-#         
-#         
-# class LearnNode(BaseLearnNode):
-#     def __init__(self, estimator, parents, children, pass_through):
-#         '''
-#         parents : dict {parent_estimator: [(name, ), ...]}
-#         children : dict {method: child_estimators}
-#         '''
-#         super(self, LearnNode).__init__(estimator, parents, children, pass_through)
-#         
-# class InputNode(BaseLearnNode):
-#     def __init__(self, estimator, children, pass_through):
-#         '''
-#         children : dict {method: child_estimators}
-#         '''
-#         super(self, InputNode).__init__(estimator, None, children, pass_through)
-#         
-# class OutputNode(BaseLearnNode):
-#     def __init__(self, estimator, parents, pass_through):
-#         '''
-#         parents : dict {parent_estimator: (names...)}
-#         '''
-#         super(self, OutputNode).__init__(estimator, parents, None)
-#         
-# class LearnGraph(BaseEstimator):
-#     def __init__(self, output_node):
-#         self.output_node = output_node
-#         
-# 
-# def pack(X, y, sample_weight):
-#     return (X, y, sample_weight)
-# #     if len(X.shape) > 1:
-# #         n_x = X.shape[1]
-# #     else:
-# #         n_x = 1
-# #     if y is not None and len(y.shape) > 1:
-# #         n_y = y.shape[1]
-# #     elif y is not None:
-# #         n_y = 1
-# #     else:
-# #         n_y = 0
-# #     if sample_weight is not None and len(sample_weight.shape) > 1:
-# #         n_w = sample_weight.shape[1]
-# #     elif sample_weight is not None:
-# #         n_w = 1
-# #     else:
-# #         n_w = 0
-# #     
-# #     if X.shape[0] > 3:
-# #         result = np.empty(shape=X.shape[0], n_x + n_y + n_w + 1)
-# #         result[0,-1] = n_x
-# #         result[1,-1] = n_y
-# #         result[2,-1] = n_w
-# #         result[:, :n_x] = X
-# #         result[:, n_x:(n_x+n_y)] = y
-# #         result[:, (n_x+n_y):(n_x+n_y+n_w)] = sample_weight
-# #         
-# #     else:
-# #         result = np.empty(shape=X.shape[0], n_x + n_y + n_w + 3)
-# #         result[0,-1] = n_x
-# #         result[0,-2] = n_y
-# #         result[0,-3] = n_w
-# #         result[:, :n_x] = X
-# #         result[:, n_x:(n_x+n_y)] = y
-# #         result[:, (n_x+n_y):(n_x+n_y+n_w)] = sample_weight
-# #     return result
-
-#     
-# 
-# class Packer(BaseEstimator):
-#     '''
-#     A bit of a hack to get more functionality out of Pipeline.
-#     '''
-#     
-#     def fit(self, X, y=None, sample_weight=None, *args, **kwargs):
-#         return self
-#     
-#     def transform(self, X, y=None, sample_weight=None):
-#         return pack(X, y, sample_weight)
-#         
-# class PackedEstimator(BaseEstimator):
-#     '''
-#     A bit of a hack to get more functionality out of Pipeline.
-#     '''
-#     def __init__(self, estimator):
-#         self.estimator = estimator
-#         
-#     def fit(self, X, y=None, *args, **kwargs):
-#         X, y, sample_weight = X
-#         self.estimator_ = clone(self.estimator).fit(X, y, *args, **kwargs)
-# #         self.
-# 
-# class Unpacker(BaseEstimator):
-#     '''
-#     A bit of a hack to get more functionality out of Pipeline.
-#     '''
+from sklearn.utils import safe_mask
+    
 class SklearnTool(object):
     pass
 
@@ -255,7 +129,6 @@ class ResponseTransformingEstimator(STSimpleEstimator, TransformerMixin):
 #         pass
 #     
 
-
 class QuantileRegressor(STSimpleEstimator):
     _estimator_type = 'regressor'
     def __init__(self, q, prevent_crossing=True, lower_bound=None, upper_bound=None):
@@ -307,8 +180,6 @@ class QuantileRegressor(STSimpleEstimator):
     def predict(self, X):
         return np.dot(X, self.coef_)
 
-
-    
 def weighted_average_score_combine(scores):
     scores_arr = np.array(scores)
     return np.average(scores_arr[0,:], weights=scores_arr[:,1])
@@ -319,12 +190,13 @@ def check_score_combiner(estimator, score_combiner):
     else:
         raise NotImplementedError('Score combiner %s not implemented' % str(score_combiner))
 
-class FeatureImportanceEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
-    def __init__(self, estimator, cv=None, scoring=None, score_combiner=None, 
-                 n_jobs=1, verbose=0, pre_dispatch='2*n_jobs'):
+class SingleEliminationFeatureImportanceEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
+    def __init__(self, estimator, cv=None, scoring=None, check_constant_model=True, 
+                 score_combiner=None, n_jobs=1, verbose=0, pre_dispatch='2*n_jobs'):
         self.estimator = estimator
         self.cv = cv
         self.scoring = scoring
+        self.check_constant_model = check_constant_model
         self.score_combiner = score_combiner
         self.n_jobs = n_jobs
         self.verbose = verbose
@@ -343,12 +215,12 @@ class FeatureImportanceEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
         n_features = X.shape[1]
         feature_deletion_scores = []
         
-#         # Get cross-validated scores with all features present
-#         scores = parallel(delayed(_fit_and_score)(clone(self.estimator), X, y, scorer,
-#                                       train, test, self.verbose, None,
-#                                       kwargs)
-#                               for train, test in cv)
-#         all_features_score = combiner(scores)
+        # Get cross-validated scores with all features present
+        full_scores = parallel(delayed(_fit_and_score)(clone(self.estimator), X, y, scorer,
+                                      train, test, self.verbose, None,
+                                      kwargs)
+                              for train, test in cv)
+        self.score_ = combiner(full_scores)
         
         # For each feature, remove that feature and get the cross-validation scores
         for col in range(n_features):
@@ -356,27 +228,63 @@ class FeatureImportanceEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
             
             if n_features > 1:
                 test_features[col] = False
-            
-            scores = parallel(delayed(_fit_and_score)(clone(self.estimator), X[:, test_features], y, scorer,
-                                      train, test, self.verbose, None,
-                                      kwargs)
-                              for train, test in cv)
+                
+                scores = parallel(delayed(_fit_and_score)(clone(self.estimator), X[:, test_features], y, scorer,
+                                          train, test, self.verbose, None,
+                                          kwargs)
+                                  for train, test in cv)
+            elif self.check_constant_model:
+                # If there's only one feature to begin with, do the fitting and scoring on a 
+                # constant predictor.
+                scores = parallel(delayed(_fit_and_score)(clone(self.estimator), np.ones(shape=(X.shape[0], 1)), 
+                                          y, scorer, train, test, self.verbose, None, kwargs)
+                                  for train, test in cv)
+            else:
+                scores = full_scores
             score = combiner(scores)
             feature_deletion_scores.append(score)
         
-        # Higher scores are better.  Higher feature importance means the feature is more important, 
-        # and feature importances should add to 1.  This code reconciles these facts.  Note that this 
-        # method guarantees that the least important feature has zero importance.
-        self.feature_importances_ = max(feature_deletion_scores) - np.array(feature_deletion_scores)
-        self.feature_importances_ /= np.sum(self.feature_importances_)
+        # Higher scores are better.  Higher feature importance means the feature is more important. 
+        # This code reconciles these facts.
+        self.feature_importances_ = self.score_ - np.array(feature_deletion_scores)
         
         # Finally, fit on the full data set
         self.estimator_ = clone(self.estimator).fit(X, y, **kwargs)
     
+        # A fit method should always return self for chaining purposes
+        return self
+    
     def predict(self, X, *args, **kwargs):
         return self.estimator_.predict(X, *args, **kwargs)
+    
+    def score(self, X, y, sample_weight=None):
+        scorer = check_scoring(self.estimator, scoring=self.scoring)
+        return scorer(self, X, y, sample_weight)
 
 class STSelector(STSimpleEstimator, SelectorMixin, MetaEstimatorMixin, TransformerMixin):
+    
+    # Override transform method from SelectorMixin because it doesn't handle the
+    # case of selecting zero features the way I want it to.
+    def transform(self, X):
+        """Reduce X to the selected features.
+
+        Parameters
+        ----------
+        X : array of shape [n_samples, n_features]
+            The input samples.
+
+        Returns
+        -------
+        X_r : array of shape [n_samples, n_selected_features]
+            The input samples with only the selected features.
+        """
+        mask = self.get_support()
+        if not mask.any():
+            return np.ones(shape=(X.shape[0], 1))
+        if len(mask) != X.shape[1]:
+            raise ValueError("X has a different shape than during fitting.")
+        return X[:, safe_mask(X, mask)]
+    
     @if_delegate_has_method(delegate='estimator')
     def predict(self, X):
         """Reduce X to the selected features and then predict using the
@@ -428,256 +336,79 @@ class STSelector(STSimpleEstimator, SelectorMixin, MetaEstimatorMixin, Transform
     def predict_log_proba(self, X):
         return self.estimator_.predict_log_proba(self.transform(X))
 
-# class RFE(STSelector):
-#     def __init__(self, estimator, n_features_to_select=None, step=1,
-#                  estimator_params=None, verbose=0):
-#         self.estimator = estimator
-#         self.n_features_to_select = n_features_to_select
-#         self.step = step
-#         self.estimator_params = estimator_params
-#         self.verbose = verbose
-#         
-#     def fit(self, X, y):
-#         """Fit the RFE model and then the underlying estimator on the selected
-#            features.
-# 
-#         Parameters
-#         ----------
-#         X : {array-like, sparse matrix}, shape = [n_samples, n_features]
-#             The training input samples.
-# 
-#         y : array-like, shape = [n_samples]
-#             The target values.
-#         """
-#         return self._fit(X, y)
-#     
-#     def _fit(self, X, y, step_score=None):
-#         X, y = check_X_y(X, y, "csc", multi_output=True)
-#         # Initialization
-#         n_features = X.shape[1]
-#         if self.n_features_to_select is None:
-#             n_features_to_select = n_features // 2
-#         else:
-#             n_features_to_select = self.n_features_to_select
-# 
-#         if 0.0 < self.step < 1.0:
-#             step = int(max(1, self.step * n_features))
-#         else:
-#             step = int(self.step)
-#         if step <= 0:
-#             raise ValueError("Step must be >0")
-# 
-#         if self.estimator_params is not None:
-#             warnings.warn("The parameter 'estimator_params' is deprecated as "
-#                           "of version 0.16 and will be removed in 0.18. The "
-#                           "parameter is no longer necessary because the value "
-#                           "is set via the estimator initialisation or "
-#                           "set_params method.", DeprecationWarning)
-# 
-#         support_ = np.ones(n_features, dtype=np.bool)
-#         ranking_ = np.ones(n_features, dtype=np.int)
-# 
-#         if step_score:
-#             self.scores_ = []
-# 
-#         # Elimination
-#         while np.sum(support_) > n_features_to_select:
-#             # Remaining features
-#             features = np.arange(n_features)[support_]
-# 
-#             # Rank the remaining features
-#             estimator = clone(self.estimator)
-#             if self.estimator_params:
-#                 estimator.set_params(**self.estimator_params)
-#             if self.verbose > 0:
-#                 print("Fitting estimator with %d features." % np.sum(support_))
-# 
-#             estimator.fit(X[:, features], y)
-# 
-#             # Get coefs
-#             if hasattr(estimator, 'coef_'):
-#                 coefs = estimator.coef_
-#             elif hasattr(estimator, 'feature_importances_'):
-#                 coefs = estimator.feature_importances_
-#             else:
-#                 raise RuntimeError('The classifier does not expose '
-#                                    '"coef_" or "feature_importances_" '
-#                                    'attributes')
-# 
-#             # Get ranks
-#             if coefs.ndim > 1:
-#                 ranks = np.argsort(safe_sqr(coefs).sum(axis=0))
-#             else:
-#                 ranks = np.argsort(safe_sqr(coefs))
-# 
-#             # for sparse case ranks is matrix
-#             ranks = np.ravel(ranks)
-# 
-#             # Eliminate the worse features
-#             threshold = min(step, np.sum(support_) - n_features_to_select)
-# 
-#             # Compute step score on the previous selection iteration
-#             # because 'estimator' must use features
-#             # that have not been eliminated yet
-#             if step_score:
-#                 self.scores_.append(step_score(estimator, features))
-#             try:
-#                 support_[features[ranks][:threshold]] = False
-#             except:
-#                 support_[features[ranks][:threshold]] = False
-#             ranking_[np.logical_not(support_)] += 1
-# 
-#         # Set final attributes
-#         features = np.arange(n_features)[support_]
-#         self.estimator_ = clone(self.estimator)
-#         if self.estimator_params:
-#             self.estimator_.set_params(**self.estimator_params)
-#         self.estimator_.fit(X[:, features], y)
-# 
-#         # Compute step score when only n_features_to_select features left
-#         if step_score:
-#             self.scores_.append(step_score(self.estimator_, features))
-#         self.n_features_ = support_.sum()
-#         self.support_ = support_
-#         self.ranking_ = ranking_
-# 
-#         return self
-# 
-# class BRFE(STSelector):
-#     '''
-#     Performs recursive feature elimination, but chooses the best set of features
-#     instead of just pruning to a pre-selected number.
-#     '''
-#     def __init__(self, estimator, min_features_to_select=1, step=1,
-#                  verbose=0):
-#         self.estimator = estimator
-#         self.min_features_to_select = min_features_to_select
-#         self.step = step
-#         self.verbose = verbose
-#     
-#     def fit(self, X, y, *args, **kwargs):
-#         # Fit the RFE, which is most of the work
-#         rfe = RFE(clone(self.estimator), self.min_features_to_select,
-#                               self.step, self.verbose)
-#         rfe.fit(X, y, *args, **kwargs)
-#         
-#         # Find the best scoring step from the RFE
-#         best_score = float('-inf')
-#         best_idx = None
-#         for i, score in enumerate(rfe.scores_):
-#             if score >= best_score:
-#                 best_score = score
-#                 best_idx = i
-#                 
-#         # Calculate the mask for that step
-#         thresh = len(rfe.scores_ - best_idx)
-#         mask = rfe.ranking_ <= thresh
-#         
-#         # Set fitted attributes
-#         self.support_ = mask
-#         self.n_input_features_ = np.sum(self.support_)
-#         self.rfe_ = rfe
-#         self.self.estimator_ = clone(self.estimator).fit(X[:, self.support_], y, **kwargs)
-#         
-#     def predict(self, X, **kwargs):
-#         if X.shape[1] == self.n_input_features_:
-#             return self.estimator_.predict(X[:, self.support_], **kwargs)
-#         elif X.shape[1] == self.n_features_:
-#             return self.estimator_.predict(X, **kwargs)
-#         else:
-#             raise IndexError('X does not have the right number of columns')
-#         
-
-
-# def check_chooser(chooser):
-#     if chooser is None:
-#         return BestImportanceChooser()
-#     if hasattr(chooser, 'update') and hasattr(chooser, 'choose'):
-#         return chooser
-#     
-
-class BackwardEliminationEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
-    def __init__(self, estimator, cv=None, scoring=None, score_combining=None, 
-                 choosing=None, n_jobs=1, verbose=0, pre_dispatch='2*n_jobs'):
+class BackwardEliminationEstimator(STSelector, MetaEstimatorMixin):
+    def __init__(self, estimator, scoring=None, check_constant_model=True):
         self.estimator = estimator
-        self.cv = cv
         self.scoring = scoring
-        self.score_combining = score_combining
-        self.choosing = choosing
-        self.n_jobs = n_jobs
-        self.verbose = verbose
-        self.pre_dispatch = pre_dispatch
-    
-    def _get_support_mask(self):
-        return self.support_
-    
-    @property
-    def _estimator_type(self):
-        return self.estimator._estimator_type
+        self.check_constant_model = check_constant_model
     
     def fit(self, X, y, **kwargs):
-        cv = check_cv(self.cv, X=X, y=y, classifier=is_classifier(self.estimator))
         scorer = check_scoring(self.estimator, scoring=self.scoring)
-        combiner = check_score_combiner(self.estimator, self.score_combining)
-        parallel = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
-                        pre_dispatch=self.pre_dispatch)
         n_features = X.shape[1]
+        sample_weight = kwargs.get('sample_weight', None)
         
         # Do stepwise backward elimination to find best feature set
-        step_features = np.ones(shape=n_features, dtype=bool)
+        support = np.ones(shape=n_features, dtype=bool)
         best_score = -float('inf')
         best_support = None
         best_n_features = None
         elimination = []
-        elimination_scores = []
-        while np.sum(step_features) > 1:
-            best_step_score = -float('inf')
-            best_step_support = None
-            best_step_col = None
-            for col in range(n_features):
-                if step_features[col]:
-                    test_features = step_features.copy()
-                    test_features[col] = False
-                    
-                    scores = parallel(delayed(_fit_and_score)(clone(self.estimator), X[:, test_features], y, scorer,
-                                              train, test, self.verbose, None,
-                                              kwargs)
-                                      for train, test in cv)
-                    score = combiner(scores)
-                    if score > best_step_score:
-                        best_step_score = score
-                        best_step_support = test_features
-                        best_step_col = col
-                    
-            elimination.append(best_step_col)
-            elimination_scores.append(best_step_score)
-            step_features[best_step_col] = False
-            if best_step_score > best_score:
-                best_score = best_step_score
-                best_support = best_step_support
-                best_n_features = np.sum(step_features)
-                
+        scores = []
+        while np.sum(support) >= 1:
+            
+            # Fit the estimator 
+            estimator = clone(self.estimator).fit(X[:, support], y, **kwargs)
+            
+            # Score the estimator
+            if self.scoring is None and hasattr(estimator, 'score_'):
+                score = estimator.score_
+            else:
+                score = scorer(estimator, X, y, sample_weight)
+            scores.append(score)
+            
+            # Compare to previous tries
+            if score > best_score:
+                best_score = score
+                best_support = support.copy()
+                best_n_features = np.sum(support)
+            
+            # Remove the least important feature from the support for next time
+            worst_feature = np.argmin(estimator.feature_importances_)
+            worst_feature_idx = np.argwhere(support)[worst_feature][0]
+            support[worst_feature_idx] = False
+            elimination.append(worst_feature_idx)
+            
+        # Score a constant input model in case it's the best choice.
+        # (This would mean the predictors are essentially useless.)
+        if self.check_constant_model:
+            # Fit the estimator 
+            estimator = clone(self.estimator).fit(np.ones(shape=(X.shape[0],1)), y, **kwargs)
+            
+            # Score the estimator
+            if self.scoring is None and hasattr(estimator, 'score_'):
+                score = estimator.score_
+            else:
+                score = scorer(estimator, X, y, sample_weight)
+            
+            # Compare to previous tries
+            if score > best_score:
+                best_score = score
+                best_support = np.zeros_like(support)
+                best_n_features = 0
+            scores.append(score)
+        
         # Set attributes for best feature set
         self.n_input_features_ = n_features
         self.n_features_ = best_n_features
         self.support_ = best_support
         self.elimination_sequence_ = np.array(elimination)
-        self.elimination_score_sequence_ = np.array(elimination_scores)
+        self.scores_ = np.array(scores)
         
         # Finally, fit on the full data set with the selected set of features
         self.estimator_ = clone(self.estimator).fit(X[:, self.support_], y, **kwargs)
         
         return self
-
-#     def predict(self, X, **kwargs):
-#         if X.shape[1] == self.n_input_features_:
-#             return self.estimator_.predict(X[:, self.support_], **kwargs)
-#         elif X.shape[1] == self.n_features_:
-#             return self.estimator_.predict(X, **kwargs)
-#         else:
-#             raise IndexError('X does not have the right number of columns')
-
-
+    
 class MultipleResponseEstimator(STSimpleEstimator, MetaEstimatorMixin):
     def __init__(self, base_estimators):
         self.base_estimators = base_estimators

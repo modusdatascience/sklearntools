@@ -4,8 +4,8 @@ Created on Feb 23, 2016
 @author: jason
 '''
 import numpy as np
-from sklearntools import QuantileRegressor, BackwardEliminationEstimatorCV,\
-    MultipleResponseEstimator, ProbaPredictingEstimator, FeatureImportanceEstimatorCV
+from sklearntools import QuantileRegressor, BackwardEliminationEstimator,\
+    MultipleResponseEstimator, ProbaPredictingEstimator, SingleEliminationFeatureImportanceEstimatorCV
 from sklearn.linear_model.base import LinearRegression
 from sklearn.linear_model.logistic import LogisticRegression
 
@@ -53,7 +53,7 @@ def test_quantile_regression():
     # Unconstrained
     qr = QuantileRegressor(taus[1:-1], prevent_crossing=False).fit(X, y, w)
 
-def test_feature_importance_estimator_cv():
+def test_single_elimination_feature_importance_estimator_cv():
     np.random.seed(0)
     m = 100000
     n = 6
@@ -68,7 +68,7 @@ def test_feature_importance_estimator_cv():
     y = np.dot(X, beta) + 0.01 * np.random.normal(size=(m, 1))
     
     target_sequence = np.ravel(np.argsort(beta ** 2, axis=0))
-    model1 = FeatureImportanceEstimatorCV(LinearRegression())
+    model1 = SingleEliminationFeatureImportanceEstimatorCV(LinearRegression())
     model1.fit(X, y)
     fitted_sequence = np.ravel(np.argsort(model1.feature_importances_, axis=0))
     
@@ -90,13 +90,13 @@ def test_backward_elimination_estimation():
     y = np.dot(X, beta) + 0.01 * np.random.normal(size=(m, 1))
     
     target_sequence = np.ravel(np.argsort(beta ** 2, axis=0))
-    model1 = BackwardEliminationEstimatorCV(LinearRegression())
+    model1 = BackwardEliminationEstimator(SingleEliminationFeatureImportanceEstimatorCV(LinearRegression(), check_constant_model=False))
     model1.fit(X, y)
     
 #     model2 = BRFE(FeatureImportanceEstimatorCV(LinearRegression()))
 #     model2.fit(X, y)
     
-    np.testing.assert_array_equal(model1.elimination_sequence_, target_sequence[:-1])
+    np.testing.assert_array_equal(model1.elimination_sequence_, target_sequence)
 
 def test_multiple_response_regressor():
     np.random.seed(1)
@@ -123,9 +123,13 @@ def test_multiple_response_regressor():
     model.predict(X)
 
 if __name__ == '__main__':
+    print 1
     test_quantile_regression()
-    test_feature_importance_estimator_cv()
+    print 2
+    test_single_elimination_feature_importance_estimator_cv()
+    print 3
     test_backward_elimination_estimation()
+    print 4
     test_multiple_response_regressor()
     print 'Success!'
     
