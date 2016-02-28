@@ -5,9 +5,11 @@ Created on Feb 23, 2016
 '''
 import numpy as np
 from sklearntools import QuantileRegressor, BackwardEliminationEstimator,\
-    MultipleResponseEstimator, ProbaPredictingEstimator, SingleEliminationFeatureImportanceEstimatorCV
+    MultipleResponseEstimator, ProbaPredictingEstimator, SingleEliminationFeatureImportanceEstimatorCV,\
+    mask_estimator
 from sklearn.linear_model.base import LinearRegression
 from sklearn.linear_model.logistic import LogisticRegression
+from calibration import CalibratedEstimatorCV
 
 
 def sim_quantiles(taus, quantiles):
@@ -122,15 +124,32 @@ def test_multiple_response_regressor():
     model.get_params()
     model.predict(X)
 
+def test_calibration():
+    np.random.seed(1)
+    m = 10000
+    n = 10
+    
+    X = np.random.normal(size=(m,n))
+    beta = np.random.normal(size=(n,1))
+    y_lin = np.dot(X, beta)
+    y_clas = np.random.binomial( 1, 1. / (1. + np.exp(-y_lin)) )
+    y = np.concatenate([y_lin, y_clas], axis=1)
+    estimator = mask_estimator(LinearRegression(), np.array([True, False], dtype=bool))
+    calibrator = mask_estimator(LogisticRegression(), [False, True])
+#     estimator = linear_regressor & calibrator
+#     MultipleResponseEstimator([('estimator', np.array([True, False], dtype=bool), LinearRegression())])
+#     calibrator = MultipleResponseEstimator([('calibrator', np.array([False, True], dtype=bool), LogisticRegression())])
+    model = CalibratedEstimatorCV(estimator, calibrator)
+    model.fit(X, y)
+    assert np.max(beta[:, 0] - model.estimator_.estimators_[0][2].coef_) < .000001
+    assert np.max(model.calibrator_.estimators_[0][2].coef_ - 1.) < .1
+
 if __name__ == '__main__':
-    print 1
     test_quantile_regression()
-    print 2
     test_single_elimination_feature_importance_estimator_cv()
-    print 3
     test_backward_elimination_estimation()
-    print 4
     test_multiple_response_regressor()
+    test_calibration()
     print 'Success!'
     
     
