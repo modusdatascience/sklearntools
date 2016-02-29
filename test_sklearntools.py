@@ -4,12 +4,13 @@ Created on Feb 23, 2016
 @author: jason
 '''
 import numpy as np
-from sklearntools import QuantileRegressor, BackwardEliminationEstimator,\
-    MultipleResponseEstimator, ProbaPredictingEstimator, SingleEliminationFeatureImportanceEstimatorCV,\
-    mask_estimator
+from sklearntools import MultipleResponseEstimator, ProbaPredictingEstimator, mask_estimator
 from sklearn.linear_model.base import LinearRegression
 from sklearn.linear_model.logistic import LogisticRegression
 from calibration import CalibratedEstimatorCV
+from quantile import QuantileRegressor
+from feature_selection import SingleEliminationFeatureImportanceEstimatorCV,\
+    BackwardEliminationEstimator
 
 
 def sim_quantiles(taus, quantiles):
@@ -144,12 +145,30 @@ def test_calibration():
     assert np.max(beta[:, 0] - model.estimator_.estimators_[0][2].coef_) < .000001
     assert np.max(model.calibrator_.estimators_[0][2].coef_ - 1.) < .1
 
+def test_pipeline():
+    np.random.seed(1)
+    m = 10000
+    n = 10
+    
+    X = np.random.normal(size=(m,n))
+    beta = np.random.normal(size=(n,1))
+    beta[np.random.binomial(p=2.0/float(n), n=1, size=n).astype(bool)] = 0
+    y = np.dot(X, beta) + 0.5 * np.random.normal(size=(m, 1))
+    beta_reduced = beta[beta != 0]
+    
+    model = BackwardEliminationEstimator(SingleEliminationFeatureImportanceEstimatorCV(LinearRegression(), check_constant_model=False)) 
+    model >>= LinearRegression()
+    
+    model.fit(X, y)
+    assert np.max(np.abs(model.steps[1][1].coef_ - beta_reduced)) < .1
+    
 if __name__ == '__main__':
     test_quantile_regression()
     test_single_elimination_feature_importance_estimator_cv()
     test_backward_elimination_estimation()
     test_multiple_response_regressor()
     test_calibration()
+    test_pipeline()
     print 'Success!'
     
     
