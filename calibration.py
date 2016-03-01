@@ -1,5 +1,6 @@
 from sklearntools import STSimpleEstimator
-from sklearn.base import MetaEstimatorMixin, is_classifier, clone
+from sklearn.base import MetaEstimatorMixin, is_classifier, clone,\
+    TransformerMixin
 from sklearn.cross_validation import check_cv
 from sklearn.externals.joblib.parallel import Parallel, delayed
 import numpy as np
@@ -168,15 +169,67 @@ class CalibratedEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
         if self.cal_exposure and exposure is not None:
             cal_args['exposure'] = exposure
         return self.calibrator_.predict_log_proba(**cal_args)
+
+class IdentityTransformer(STSimpleEstimator, TransformerMixin):
+    def __init__(self):
+        pass
+     
+    def fit(self, X, y=None, sample_weight=None):
+        pass
+     
+    def transform(self, X, y=None):
+        return X
+
+class LogTransformer(STSimpleEstimator, TransformerMixin):
+    def __init__(self, offset = 1.):
+        self.offset = offset
+     
+    def fit(self, X, y=None, sample_weight=None):
+        pass
+     
+    def transform(self, X, y=None):
+        return np.log(self.offset + X)
+
+class ResponseTransformingEstimator(STSimpleEstimator):
+    def __init__(self, estimator, transformer, est_weight=False, trans_weight=False):
+        self.estimator = estimator
+        self.transformer = transformer
+        self.est_weight = est_weight
+        self.trans_weight = trans_weight
     
+    @property
+    def _estimator_type(self):
+        return self.estimator._estimator_type
     
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+    def fit(self, X, y, sample_weight=None, transformer_args={}, estimator_args={}):
+        transformer_args_ = {'y': y}
+        transformer_args_.update(transformer_args)
+        if self.trans_weight:
+            transformer_args_['sample_weight'] = sample_weight
+        self.transformer_ = clone(self.transformer).fit(**transformer_args_)
+        y_transformed = self.transformer_.transform(y)
+        estimator_args_ = {'x': X, 'y': y_transformed}
+        estimator_args_.update(estimator_args)
+        if self.est_weight:
+            estimator_args_['sample_weight'] = sample_weight
+        self.estimator_ = clone(self.estimator).fit(**estimator_args)
+        return self
+    
+    def predict(self, X):
+        return self.estimator_.predict(X)
+    
+    @if_delegate_has_method('estimator')
+    def transform(self, X):
+        return self.estimator_.transform(X)
+    
+    @if_delegate_has_method('estimator')
+    def predict_proba(self, X):
+        return self.estimator_.predict_proba(X)
+    
+    @if_delegate_has_method('estimator')
+    def predict_log_proba(self, X):
+        return self.estimator_.predict_log_proba(X)
+    
+    @if_delegate_has_method('estimator')
+    def decision_function(self, X):
+        return self.estimator_.decision_function(X)

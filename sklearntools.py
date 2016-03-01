@@ -226,34 +226,6 @@ class MultipleResponseEstimator(STSimpleEstimator, MetaEstimatorMixin):
             predictions.append(prediction if len(prediction.shape) == 2 else prediction[:, None])
         return np.concatenate(predictions, axis=1)
 
-
-class IdentityTransformer(STSimpleEstimator, TransformerMixin):
-    def __init__(self):
-        pass
-     
-    def fit(self, X, y=None, sample_weight=None):
-        pass
-     
-    def transform(self, X, y=None):
-        return X
-
-class ResponseTransformingEstimator(STSimpleEstimator, TransformerMixin):
-    def __init__(self, estimator, transformer, inverter=IdentityTransformer()):
-        self.estimator = estimator
-        self.transformer = transformer
-        self.inverter = inverter
-        
-    def fit(self, X, y, transformer_args, estimator_args, inverter_args):
-        self.transformer_ = clone(self.transformer).fit(y, **transformer_args)
-        y_transformed = self.transformer_.transform(y)
-        self.estimator_ = clone(self.estimator).fit(X, y_transformed, **estimator_args)
-        y_predicted = self.estimator_.predict(X)
-        self.inverter_ = clone(self.inverter).fit(y_predicted, y)
-        return self
-    
-    def predict(self, X, transformer_args, estimator_args, inverter_args):
-        return self.inverter_.transform(self.estimator_.predict(X))
-        
 class ProbaPredictingEstimator(STSimpleEstimator, MetaEstimatorMixin):
     def __init__(self, base_estimator):
         self.base_estimator = base_estimator
