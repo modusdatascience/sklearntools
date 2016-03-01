@@ -175,7 +175,7 @@ class IdentityTransformer(STSimpleEstimator, TransformerMixin):
         pass
      
     def fit(self, X, y=None, sample_weight=None):
-        pass
+        return self
      
     def transform(self, X, y=None):
         return X
@@ -185,11 +185,38 @@ class LogTransformer(STSimpleEstimator, TransformerMixin):
         self.offset = offset
      
     def fit(self, X, y=None, sample_weight=None):
-        pass
+        return self
      
     def transform(self, X, y=None):
         return np.log(self.offset + X)
 
+def index(table, idx0, idx1):
+    if hasattr(table, 'loc'):
+        return table.loc[idx0, idx1]
+    else:
+        return table[idx0, idx1]
+
+class MultiTransformer(STSimpleEstimator, TransformerMixin, MetaEstimatorMixin):
+    def __init__(self, transformers):
+        self.transformers = transformers
+        
+    def fit(self, X, y=None, sample_weight=None):
+        self.transformers_ = [(name, mask, clone(trans)) for name, mask, trans in self.transformers]
+        for _, mask, trans in self.transformers_:
+            args = {'X': index(X, slice(None), mask)}
+            if y is not None:
+                args['y'] = y
+            if sample_weight is not None:
+                args['sample_weight'] = sample_weight
+            trans.fit(**args)
+        return self
+    
+    def transform(self, X):
+        results = []
+        for _, mask, trans in self.transformers_:
+            results.append(trans.transform(index(X, slice(None), mask)))
+        return np.concatenate(results, axis=1)
+    
 class ResponseTransformingEstimator(STSimpleEstimator):
     def __init__(self, estimator, transformer, est_weight=False, trans_weight=False):
         self.estimator = estimator
@@ -202,18 +229,25 @@ class ResponseTransformingEstimator(STSimpleEstimator):
         return self.estimator._estimator_type
     
     def fit(self, X, y, sample_weight=None, transformer_args={}, estimator_args={}):
-        transformer_args_ = {'y': y}
+        transformer_args_ = {'X': y}
         transformer_args_.update(transformer_args)
         if self.trans_weight:
             transformer_args_['sample_weight'] = sample_weight
         self.transformer_ = clone(self.transformer).fit(**transformer_args_)
         y_transformed = self.transformer_.transform(y)
-        estimator_args_ = {'x': X, 'y': y_transformed}
+        estimator_args_ = {'X': X, 'y': y_transformed}
         estimator_args_.update(estimator_args)
         if self.est_weight:
             estimator_args_['sample_weight'] = sample_weight
-        self.estimator_ = clone(self.estimator).fit(**estimator_args)
+        self.estimator_ = clone(self.estimator).fit(**estimator_args_)
         return self
+    
+    def score(self, X, y, sample_weight=None):
+        y_transformed = self.transformer_.transform(y)
+        args = {'X': X, 'y': y_transformed}
+        if self.est_weight:
+            args['sample_weight'] = sample_weight
+        return self.estimator_.score(**args)
     
     def predict(self, X):
         return self.estimator_.predict(X)
