@@ -7,7 +7,8 @@ import numpy as np
 from sklearntools import MultipleResponseEstimator, ProbaPredictingEstimator, mask_estimator
 from sklearn.linear_model.base import LinearRegression
 from sklearn.linear_model.logistic import LogisticRegression
-from calibration import CalibratedEstimatorCV
+from calibration import CalibratedEstimatorCV, ResponseTransformingEstimator,\
+    LogTransformer
 from quantile import QuantileRegressor
 from feature_selection import SingleEliminationFeatureImportanceEstimatorCV,\
     BackwardEliminationEstimator
@@ -161,7 +162,24 @@ def test_pipeline():
     
     model.fit(X, y)
     assert np.max(np.abs(model.steps[1][1].coef_ - beta_reduced)) < .1
+
+def test_response_transforming_estimator():
+    np.random.seed(1)
+    m = 10000
+    n = 10
     
+    X = np.random.normal(size=(m,n))
+    beta = np.random.normal(size=(n,1))
+    sigma = .1
+    y_pre = np.dot(X, beta) + sigma * np.random.normal(size=(m,1))
+    y_post = np.exp(y_pre)
+    
+    model = ResponseTransformingEstimator(LinearRegression(), LogTransformer(offset=0.))
+    model.fit(X, y_post)
+    
+    assert np.abs(np.mean(model.predict(X) - y_pre)) < .01
+    
+
 if __name__ == '__main__':
     test_quantile_regression()
     test_single_elimination_feature_importance_estimator_cv()
@@ -169,6 +187,7 @@ if __name__ == '__main__':
     test_multiple_response_regressor()
     test_calibration()
     test_pipeline()
+    test_response_transforming_estimator()
     print 'Success!'
     
     
