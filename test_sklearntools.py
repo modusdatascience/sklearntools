@@ -179,6 +179,8 @@ def test_response_transforming_estimator():
     
     assert np.abs(np.mean(model.predict(X) - y_pre)) < .01
     
+def test_moving_average_smoothing_estimator():
+    pass
 
 if __name__ == '__main__':
     test_quantile_regression()

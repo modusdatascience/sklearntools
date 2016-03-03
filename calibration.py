@@ -5,6 +5,7 @@ from sklearn.cross_validation import check_cv
 from sklearn.externals.joblib.parallel import Parallel, delayed
 import numpy as np
 from sklearn.utils.metaestimators import if_delegate_has_method
+from math import ceil
 
 def _subset(data, idx):
     if len(data.shape) == 1:
@@ -74,7 +75,60 @@ class ThresholdClassifier(STSimpleEstimator, MetaEstimatorMixin):
         if exposure is not None:
             clas_args['exposure'] = exposure
         return self.classifier_.predict_log_proba(**clas_args)
-    
+
+# class SeparateSortingEstimator(STSimpleEstimator, MetaEstimatorMixin):
+#     '''
+#     Sorts X and y separately before fitting.  This is only useful if you really
+#     know what you're doing.
+#     '''
+#     def __init__(self, estimator):
+#         self.estimator = estimator
+#         
+#     def fit(self, X, y, sample_weight=None, exposure=None):
+#         pass
+
+def moving_average(y, window_size):
+    window = np.ones(int(window_size)) / float(window_size)
+    if len(y.shape) == 1:
+        y = y[:,None]
+    result = []
+    for j in range(y.shape[1]):
+        result.append(np.convolve(y[:, j], window, 'valid')[:, None])
+    return np.concatenate(result, axis=1)
+
+class MovingAverageSmoothingEstimator(STSimpleEstimator, MetaEstimatorMixin):
+    '''
+    The idea is that X is a prediction from some other estimator.  Otherwise, the order 
+    of X is not very meaningful and the resultimg model will probably be garbage. 
+    There could perhaps be other particular applications, but make sure you understand why 
+    the order of X is meaningful before using this estimator.
+    '''
+    def __init__(self, estimator, window_size=25, sort_order=None, sort_algorithm='quicksort'):
+        self.estimator = estimator
+        self.window_size = window_size
+        self.sort_order = sort_order
+        self.sort_algorithm = sort_algorithm
+        
+    def fit(self, X, y):
+        if len(y.shape) == 1:
+            y = y[:, None]
+            
+        # Sort on X
+        order = np.argsort(X, axis=0, kind=self.sort_algorithm, order=self.sort_order)
+        
+        # Moving average on X and y based on sort order of X
+        X_ = moving_average(X[order, :], self.window_size)
+        y_ = moving_average(y[order, :], self.window_size)
+        
+        # Fit estimator on the moving averages
+        self.estimator_ = clone(self.estimator).fit(X_, y_)
+        
+        return self
+        
+    def predict(self, X):
+        return self.estimator_.predict(X)
+
+
 class CalibratedEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
     def __init__(self, estimator, calibrator, est_weight=True, est_exposure=False, 
                  cal_weight=True, cal_exposure=True, cv=2, n_jobs=1, verbose=0, 
