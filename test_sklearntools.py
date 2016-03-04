@@ -61,6 +61,8 @@ def test_quantile_regression():
     
     # Unconstrained
     qr = QuantileRegressor(taus[1:-1], prevent_crossing=False).fit(X, y, w)
+    score = qr.score(X, y, w)
+    assert score > .25
 
 def test_single_elimination_feature_importance_estimator_cv():
     np.random.seed(0)
