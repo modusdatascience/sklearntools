@@ -4,14 +4,19 @@ Created on Feb 23, 2016
 @author: jason
 '''
 import numpy as np
-from sklearntools import MultipleResponseEstimator, ProbaPredictingEstimator, mask_estimator
+from sklearntools import MultipleResponseEstimator, mask_estimator
 from sklearn.linear_model.base import LinearRegression
 from sklearn.linear_model.logistic import LogisticRegression
 from calibration import CalibratedEstimatorCV, ResponseTransformingEstimator,\
-    LogTransformer
+    LogTransformer, PredictorTransformer, HazardToRiskEstimator,\
+    MovingAverageSmoothingEstimator, ThresholdClassifier, ProbaPredictingEstimator
 from quantile import QuantileRegressor
 from feature_selection import SingleEliminationFeatureImportanceEstimatorCV,\
     BackwardEliminationEstimator
+from numpy.testing.utils import assert_raises
+from glm import GLM
+import statsmodels.api as sm
+from pyearth.earth import Earth
 
 
 def sim_quantiles(taus, quantiles):
@@ -122,7 +127,7 @@ def test_multiple_response_regressor():
     
     assert np.mean(beta1 - model.estimators_dict_['linear'][1].coef_) < .01
     assert np.mean(beta2 - model.estimators_dict_['logistic'][1].estimator_.coef_) < .01
-    assert model.prediction_columns_ == ['linear', 'logistic', 'logistic']
+    assert model.prediction_columns_ == ['linear', 'logistic']
     model.get_params()
     model.predict(X)
 
@@ -179,8 +184,68 @@ def test_response_transforming_estimator():
     
     assert np.abs(np.mean(model.predict(X) - y_pre)) < .01
     
+    # Because LinearRegression has no transform method
+    assert_raises(AttributeError, lambda: model.transform(X))
+    
+def test_hazard_to_risk():
+    np.random.seed(1)
+    
+    m = 10000
+    n = 10
+    
+    # Simulate an event under constant hazard, with hazard = X * beta and 
+    # iid exponentially distributed exposure times.
+    X = np.random.normal(size=(m,n))
+    beta = np.random.normal(size=(n,1))
+    hazard = np.exp(np.dot(X, beta))
+    exposure = np.random.exponential(size=(m,1))
+    rate = np.random.poisson(hazard * exposure) / exposure
+    
+    model = CalibratedEstimatorCV(GLM(sm.families.Gaussian(sm.families.links.log), add_constant=False), 
+                                  ProbaPredictingEstimator(ThresholdClassifier(HazardToRiskEstimator(LogisticRegression()))))
+    
+    model.fit(X, rate, exposure=exposure)
+    
+    y_pred = model.predict(X, exposure)
+    assert np.abs((np.sum(y_pred) - np.sum(rate > 0)) / np.sum(rate > 0))  < .1
+    assert np.max(np.abs(model.estimator_.coef_ - beta[:,0])) < .1
+    
 def test_moving_average_smoothing_estimator():
-    pass
+    np.random.seed(1)
+    
+    m = 10000
+    n = 10
+    
+    # Simulate an event under constant hazard, with hazard = X * beta and 
+    # iid exponentially distributed exposure times.
+    X = np.random.normal(size=(m,n))
+    beta = np.random.normal(size=(n,1))
+    hazard = np.exp(np.dot(X, beta))
+    exposure = np.random.exponential(size=(m,1))
+    rate = np.random.poisson(hazard * exposure) / exposure
+    
+    model = CalibratedEstimatorCV(GLM(sm.families.Gaussian(sm.families.links.log), add_constant=False), 
+                                  ThresholdClassifier(HazardToRiskEstimator(MovingAverageSmoothingEstimator(Earth()))))
+    
+    model.fit(X, rate, exposure=exposure)
+    
+    y_pred = model.predict(X, exposure)
+    assert np.abs((np.sum(y_pred) - np.sum(rate > 0)) / np.sum(rate > 0))  < .1
+    assert np.max(np.abs(model.estimator_.coef_ - beta[:,0])) < .1
+    
+#     
+#     y_lin = np.dot(X, beta)
+#     y_clas = np.random.binomial( 1, 1. / (1. + np.exp(-y_lin)) )
+#     y = np.concatenate([y_lin, y_clas], axis=1)
+#     estimator = mask_estimator(LinearRegression(), np.array([True, False], dtype=bool))
+#     calibrator = mask_estimator(LogisticRegression(), [False, True])
+# #     estimator = linear_regressor & calibrator
+# #     MultipleResponseEstimator([('estimator', np.array([True, False], dtype=bool), LinearRegression())])
+# #     calibrator = MultipleResponseEstimator([('calibrator', np.array([False, True], dtype=bool), LogisticRegression())])
+#     model = CalibratedEstimatorCV(estimator, calibrator)
+#     model.fit(X, y)
+#     assert np.max(beta[:, 0] - model.estimator_.estimators_[0][2].coef_) < .000001
+#     assert np.max(model.calibrator_.estimators_[0][2].coef_ - 1.) < .1
 
 if __name__ == '__main__':
     test_quantile_regression()
@@ -190,6 +255,8 @@ if __name__ == '__main__':
     test_calibration()
     test_pipeline()
     test_response_transforming_estimator()
+    test_hazard_to_risk()
+    test_moving_average_smoothing_estimator()
     print 'Success!'
     
     

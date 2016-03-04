@@ -1,4 +1,5 @@
-from sklearntools import STSimpleEstimator
+from sklearntools import STSimpleEstimator, DelegatingEstimator, non_fit_methods,\
+    standard_methods
 from sklearn.base import MetaEstimatorMixin, is_classifier, clone,\
     TransformerMixin
 from sklearn.cross_validation import check_cv
@@ -96,7 +97,7 @@ def moving_average(y, window_size):
         result.append(np.convolve(y[:, j], window, 'valid')[:, None])
     return np.concatenate(result, axis=1)
 
-class MovingAverageSmoothingEstimator(STSimpleEstimator, MetaEstimatorMixin):
+class MovingAverageSmoothingEstimator(DelegatingEstimator):
     '''
     The idea is that X is a prediction from some other estimator.  Otherwise, the order 
     of X is not very meaningful and the resultimg model will probably be garbage. 
@@ -108,13 +109,14 @@ class MovingAverageSmoothingEstimator(STSimpleEstimator, MetaEstimatorMixin):
         self.window_size = window_size
         self.sort_order = sort_order
         self.sort_algorithm = sort_algorithm
+        self._create_delegates('estimator', non_fit_methods)
         
     def fit(self, X, y):
         if len(y.shape) == 1:
             y = y[:, None]
             
         # Sort on X
-        order = np.argsort(X, axis=0, kind=self.sort_algorithm, order=self.sort_order)
+        order = np.argsort(X, axis=0, kind=self.sort_algorithm, order=self.sort_order)[:,0]
         
         # Moving average on X and y based on sort order of X
         X_ = moving_average(X[order, :], self.window_size)
@@ -124,12 +126,70 @@ class MovingAverageSmoothingEstimator(STSimpleEstimator, MetaEstimatorMixin):
         self.estimator_ = clone(self.estimator).fit(X_, y_)
         
         return self
-        
-    def predict(self, X):
-        return self.estimator_.predict(X)
 
+class HazardToRiskEstimator(STSimpleEstimator, MetaEstimatorMixin):
+    '''
+    When fit, expects to receive predicted cumulative hazard per exposure as X and 
+    observed event occurrence (boolean/binary) as y.  Also expects to receive exposure.  
+    Once fit, predicts risk.
+    
+    Suggestion: Use this with a MovingAverageSmoothingEstimator as estimator and wrap it 
+    in a ThresholdClassifier while pipelining in a PredictorTransformer.
+    '''
+    def __init__(self, estimator):
+        self.estimator = estimator
+    
+    def _preprocess_x(self, X, exposure):
+        if exposure is None:
+            raise ValueError('Must provide exposure')
+        if len(X.shape) == 1:
+            X = X[:, None]
+        if len(exposure.shape) == 1:
+            exposure = exposure[:, None]
+        return np.exp(-X * exposure)
+    
+    def fit(self, X, y, sample_weight=None, exposure=None):
+        fit_args = {'X': self._preprocess_x(X, exposure),
+                    'y': y[:,0] if len(y.shape) == 2 and y.shape[1] == 1 else y}
+        if sample_weight is not None:
+            fit_args['sample_weight'] = sample_weight
+        
+        self.estimator_ = clone(self.estimator).fit(**fit_args)
+        return self
+    
+    def predict(self, X, exposure=None):
+        return self.estimator_.predict(self._preprocess_x(X, exposure))
+    
+    def predict_proba(self, X, exposure=None):
+        return self.estimator_.predict_proba(self._preprocess_x(X, exposure))
+    
+    def predict_log_proba(self, X, exposure=None):
+        return self.estimator_.predict_log_proba(self._preprocess_x(X, exposure))
+    
+    def decision_function(self, X, exposure=None):
+        return self.estimator_.decision_function(self._preprocess_x(X, exposure))
+
+class PredictorTransformer(DelegatingEstimator):
+    '''
+    Just overrides transform to use predict.  Useful for pipelines.
+    '''
+    def __init__(self, estimator):
+        self.estimator = estimator
+        self._create_delegates('estimator', standard_methods)
+    
+    def transform(self, X, exposure=None):
+        args = {}
+        if exposure is not None:
+            args['exposure'] = exposure
+        return self.predict(**args)
+
+def no_cv(X, y):
+    yield np.ones(X.shape[0]).astype(bool), np.ones(X.shape[0]).astype(bool)
 
 class CalibratedEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
+    '''
+    cv = 1 gives no cross validation.
+    '''
     def __init__(self, estimator, calibrator, est_weight=True, est_exposure=False, 
                  cal_weight=True, cal_exposure=True, cv=2, n_jobs=1, verbose=0, 
                  pre_dispatch='2*n_jobs'):
@@ -149,7 +209,10 @@ class CalibratedEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
         return self.calibrator._estimator_type
     
     def fit(self, X, y, sample_weight=None, exposure=None):
-        cv = check_cv(self.cv, X=X, y=y, classifier=is_classifier(self.calibrator))
+        if self.cv == 1:
+            cv = no_cv(X=X, y=y)
+        else:
+            cv = check_cv(self.cv, X=X, y=y, classifier=is_classifier(self.calibrator))
         parallel = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
                         pre_dispatch=self.pre_dispatch)
         
@@ -227,7 +290,7 @@ class CalibratedEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
 class IdentityTransformer(STSimpleEstimator, TransformerMixin):
     def __init__(self):
         pass
-     
+    
     def fit(self, X, y=None, sample_weight=None):
         return self
      
@@ -270,13 +333,27 @@ class MultiTransformer(STSimpleEstimator, TransformerMixin, MetaEstimatorMixin):
         for _, mask, trans in self.transformers_:
             results.append(trans.transform(index(X, slice(None), mask)))
         return np.concatenate(results, axis=1)
+
+class ProbaPredictingEstimator(DelegatingEstimator):
+    def __init__(self, estimator):
+        self.estimator = estimator
     
-class ResponseTransformingEstimator(STSimpleEstimator):
+    def fit(self, X, y, *args, **kwargs):
+        self.estimator_ = clone(self.estimator)
+        self.estimator_.fit(X, y, *args, **kwargs)
+        return self
+    
+    def predict(self, X, *args, **kwargs):
+        return self.estimator_.predict_proba(X, *args, **kwargs)[:, :-1]
+    
+class ResponseTransformingEstimator(DelegatingEstimator):
     def __init__(self, estimator, transformer, est_weight=False, trans_weight=False):
         self.estimator = estimator
         self.transformer = transformer
         self.est_weight = est_weight
         self.trans_weight = trans_weight
+        self._create_delegates('estimator', ['predict', 'transform', 'predict_proba', 
+                                             'predict_log_proba', 'decision_function'])
     
     @property
     def _estimator_type(self):
@@ -302,22 +379,22 @@ class ResponseTransformingEstimator(STSimpleEstimator):
         if self.est_weight:
             args['sample_weight'] = sample_weight
         return self.estimator_.score(**args)
-    
-    def predict(self, X):
-        return self.estimator_.predict(X)
-    
-    @if_delegate_has_method('estimator')
-    def transform(self, X):
-        return self.estimator_.transform(X)
-    
-    @if_delegate_has_method('estimator')
-    def predict_proba(self, X):
-        return self.estimator_.predict_proba(X)
-    
-    @if_delegate_has_method('estimator')
-    def predict_log_proba(self, X):
-        return self.estimator_.predict_log_proba(X)
-    
-    @if_delegate_has_method('estimator')
-    def decision_function(self, X):
-        return self.estimator_.decision_function(X)
+#     
+#     def predict(self, X):
+#         return self.estimator_.predict(X)
+#     
+#     @if_delegate_has_method('estimator')
+#     def transform(self, X):
+#         return self.estimator_.transform(X)
+#     
+#     @if_delegate_has_method('estimator')
+#     def predict_proba(self, X):
+#         return self.estimator_.predict_proba(X)
+#     
+#     @if_delegate_has_method('estimator')
+#     def predict_log_proba(self, X):
+#         return self.estimator_.predict_log_proba(X)
+#     
+#     @if_delegate_has_method('estimator')
+#     def decision_function(self, X):
+#         return self.estimator_.decision_function(X)

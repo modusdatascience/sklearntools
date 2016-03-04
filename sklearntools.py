@@ -13,7 +13,11 @@ from sklearn.pipeline import Pipeline
 from sklearn.feature_selection.base import SelectorMixin
 from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.utils import safe_mask
-    
+from six import with_metaclass
+from operator import attrgetter
+from functools import update_wrapper
+from types import MethodType
+
 class SklearnTool(object):
     pass
 
@@ -102,6 +106,134 @@ class STPipeline(STEstimator, Pipeline):
         estimators = [step[1] for step in steps]
         return STPipeline(zip(combine_named_estimators(names), estimators))
 
+#         
+class _BasicDelegateDescriptor(object):
+    def __init__(self, fn, delegate_name):
+        self.fn = fn
+        self.delegate_name = delegate_name
+        self.method_name = fn.__name__
+        # update the docstring of the descriptor
+        update_wrapper(self, fn)
+        
+    def __get__(self, obj, type=None):  # @ReservedAssignment
+        if self.delegate_name is None:
+            try:
+                delegate_name = obj._delegates[self.method_name]
+            except KeyError:
+                try:
+                    delegate_name = obj.__class__._class_delegates[self.method_name]
+                except KeyError:
+                    raise AttributeError()
+        else:
+            delegate_name = self.delegate_name
+        clone_name = delegate_name + '_'
+        
+        # If the clone doesn't exist, it needs to be created by this call
+        if not hasattr(obj, clone_name):
+            delegate = getattr(obj, delegate_name)
+            method = getattr(delegate, self.method_name)
+            def out(*args, **kwargs):
+                setattr(obj, clone_name, method(*args, **kwargs))
+                return obj
+        else:
+            delegate = getattr(obj, clone_name)
+            method = getattr(delegate, self.method_name)
+            out = lambda *args, **kwargs: method(*args, **kwargs)
+        update_wrapper(out, self.fn)
+        return out
+
+def delegate_by_name(delegate_name=None):
+    return lambda fn: _BasicDelegateDescriptor(fn, delegate_name)
+
+def delegate(fn):
+    return _BasicDelegateDescriptor(fn, None)
+
+# def delegate_init(fn):
+#     def init(self, *args, **kwargs):
+#         self._delegates = {}
+#         fn(self, *args, **kwargs)
+#     update_wrapper(init, fn)
+#     return init
+
+class DelegatingMetaClass(type):
+    '''
+    Every subclass gets its own _delegates dictionary.  If the dictionary were
+    just a normal class attribute on BaseDelegatingEstimator, it would be shared
+    among all subclasses.
+    '''
+    def __init__(cls, name, bases, dict):  # @ReservedAssignment
+        super(DelegatingMetaClass, cls).__init__(name, bases, dict)
+        cls._class_delegates = {}
+#         cls.__init__ = delegate_init(cls.__init__)
+        
+#     def __call__(cls, *args, **kwargs):  # @NoSelf
+#         obj = super(DelegatingMetaClass, cls).__call__(*args, **kwargs)
+#         obj._delegates = {}
+
+standard_methods = ['fit', 'predict', 'score', 'predict_proba', 'decision_function', 
+                         'predict_log_proba', 'transform']
+non_fit_methods = ['predict', 'score', 'predict_proba', 'decision_function', 
+                         'predict_log_proba', 'transform']
+predict_methods = ['predict', 'predict_proba', 'decision_function', 
+                         'predict_log_proba']
+
+class BaseDelegatingEstimator(with_metaclass(DelegatingMetaClass, STSimpleEstimator, MetaEstimatorMixin)):
+    def _create_delegates(self, name, method_names):
+        if not hasattr(self, '_delegates'):
+            self.delegates = {}
+        delegate_ = getattr(self, name)
+        methods = [method for method in method_names if callable(getattr(delegate_, method, None))]
+        for method in methods:
+            self._delegates[method] = name
+#             def fn(obj):
+#                 pass
+#             fn.__name__ = method
+#             setattr(self, method, delegate()(MethodType(fn, self, self.__class__)))
+
+    @delegate
+    def fit(self):
+        pass
+     
+    @delegate
+    def predict(self):
+        pass
+     
+    @delegate
+    def score(self):
+        pass
+     
+    @delegate
+    def predict_proba(self):
+        pass
+     
+    @delegate
+    def decision_function(self):
+        pass
+     
+    @delegate
+    def predict_log_proba(self):
+        pass
+     
+    @delegate
+    def transform(self):
+        pass
+
+class DelegatingEstimator(BaseDelegatingEstimator):
+    _delegates = {'fit': 'estimator', 'predict': 'estimator', 'score': 'estimator', 
+                  'predict_proba': 'estimator', 'decision_function': 'estimator', 
+                  'predict_log_proba': 'estimator'}
+    def __init__(self, estimator):
+        self.estimator = estimator
+
+class AlreadyFittedEstimator(DelegatingEstimator):
+    def __init__(self, estimator):
+        self.estimator = estimator
+        self.estimator_ = self.estimator
+        self._create_delegates('estimator', non_fit_methods)
+    
+    def fit(self, X, y=None, sample_weight=None, exposure=None):
+        return self
+    
 def mask_estimator(estimator, mask):
     try:
         return estimator.mask(mask)
@@ -226,15 +358,5 @@ class MultipleResponseEstimator(STSimpleEstimator, MetaEstimatorMixin):
             predictions.append(prediction if len(prediction.shape) == 2 else prediction[:, None])
         return np.concatenate(predictions, axis=1)
 
-class ProbaPredictingEstimator(STSimpleEstimator, MetaEstimatorMixin):
-    def __init__(self, base_estimator):
-        self.base_estimator = base_estimator
-    
-    def fit(self, X, y, *args, **kwargs):
-        self.estimator_ = clone(self.base_estimator)
-        self.estimator_.fit(X, y, *args, **kwargs)
-        return self
-    
-    def predict(self, X, *args, **kwargs):
-        return self.estimator_.predict_proba(X, *args, **kwargs)
+
 
