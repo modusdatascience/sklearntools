@@ -20,91 +20,183 @@ from types import MethodType
 
 class SklearnTool(object):
     pass
-
-def name_estimator(estimator):
-    if hasattr(estimator, 'name'):
-        return estimator.name
-    else:
-        return estimator.__class__.__name__
-
-def combine_named_estimators(names):
-    used_set = set()
-    result = []
-    for name in names:
-        new_name = name
-        i = 2
-        while new_name in used_set:
-            new_name = name + '_' + str(i)
-            i += 1
-            if i > 1e5:
-                raise ValueError('Unable to name estimator %s in pipeline' % str(name))
-        used_set.add(new_name)
-        result.append(new_name)
-    return result
+# 
+# def name_estimator(estimator):
+#     if hasattr(estimator, 'name'):
+#         return estimator.name
+#     else:
+#         return estimator.__class__.__name__
+# 
+# def combine_named_estimators(names):
+#     used_set = set()
+#     result = []
+#     for name in names:
+#         new_name = name
+#         i = 2
+#         while new_name in used_set:
+#             new_name = name + '_' + str(i)
+#             i += 1
+#             if i > 1e5:
+#                 raise ValueError('Unable to name estimator %s in pipeline' % str(name))
+#         used_set.add(new_name)
+#         result.append(new_name)
+#     return result
 
 class STEstimator(BaseEstimator, SklearnTool):
-    def mask(self, mask):
-        return mask_estimator(self, mask)
-
-    def __rshift__(self, other):
-        '''
-        self >> other
-        '''
-        return as_pipeline(self) >> other
-        
-    def __rrshift__(self, other):
-        '''
-        other >> self
-        '''
-        return as_pipeline(other) >> self
-        
-    def __lshift__(self, other):
-        '''
-        self << other
-        '''
-        return as_pipeline(other) >> self
-        
-    def __rlshift__(self, other):
-        '''
-        other << self
-        '''
-        return as_pipeline(self) >> other
+    def _process_args(self, **kwargs):
+        result = {}
+        for k, v in kwargs.items():
+            if v is not None:
+                result[k] = v
+        for k in result.keys():
+            v = result[k]
+            if isinstance(v, np.ndarray):
+                if len(v.shape) == 1:
+                    result[k] = v[:, None]
+        return result
     
+#     def mask(self, mask):
+#         return mask_estimator(self, mask)
+
     def __and__(self, other):
         '''
         self & other
         '''
-        mask_estimator(self, slice(None)) & other
+        return MultiEstimator([self]) & other
     
     def __rand__(self, other):
         '''
         other & self
         '''
-        return self & other
+        return MultiEstimator([other]) & self
+
+class StagedEstimator(STEstimator, MetaEstimatorMixin):
+    def __init__(self, stages):
+        self.stages = stages
+        self.intermediate_stages = self.stages[:-1]
+        self.final_stage = self.stages[-1]
+    
+    def __rshift__(self, other):
+        new_stages = [stage for stage in self.stages]
+        if isinstance(other, StagedEstimator):
+            new_stages += other.stages
+        else:
+            new_stages += [other]
+        return StagedEstimator(new_stages)
+            
+    def __rrshift__(self, other):
+        new_stages = self.stages.copy()
+        if isinstance(other, StagedEstimator):
+            new_stages = other.stages + new_stages
+        else:
+            new_stages = [other] + new_stages
+        return StagedEstimator(new_stages)
+    
+    def _transform_args(self, data):
+        result = {'X': data['X']}
+        if 'exposure' in data:
+            result['exposure'] = data['exposure']
+        return result
+    
+    def _update(self, data):
+        for stage in enumerate(self.intermediate_stages_):
+            try:
+                # Stage knows to discard whatever it doesn't need
+                stage.update(data)
+            except AttributeError:
+                data['X'] = stage.transform(**self._transform_args(data))
+    
+    def fit(self, X, y=None, sample_weight=None, exposure=None):
+        data = self._process_args(X=X, y=y, sample_weight=sample_weight, exposure=exposure)
+        self.intermediate_stages_ = []
+        for stage in self.intermediate_stages:
+            # Stage knows to discard whatever it doesn't need
+            stage_ = clone(stage)
+            stage_.fit(**data)
+            try:
+                stage_.update(data)
+            except AttributeError:
+                data['X'] = stage_.transform(**self._transform_args(data))
+            self.intermediate_stages_.append(stage_)
+        self.final_stage_ = clone(self.final_stage).fit(**data)
+        return self
+    
+    def predict(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        self._update(data)
+        return self.final_stage_.predict(**data)
+    
+    def predict_proba(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        self._update(data)
+        return self.final_stage_.predict_proba(**data)
+    
+    def predict_log_proba(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        self._update(data)
+        return self.final_stage_.predict_log_proba(**data)
+    
+    def score(self, X, y=None, sample_weight=None, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        self._update(data)
+        return self.final_stage_.score(**data)
+    
+    def decision_function(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        self._update(data)
+        return self.final_stage_.decision_function(**data)
+
+def staged(estimator):
+    return StagedEstimator([estimator])
         
-def as_pipeline(estimator):
-    try:
-        return estimator.as_pipeline()
-    except AttributeError:
-        return STPipeline([(name_estimator(estimator), estimator)])
+# def as_pipeline(estimator):
+#     try:
+#         return estimator.as_pipeline()
+#     except AttributeError:
+#         return STPipeline([(name_estimator(estimator), estimator)])
 
 class STSimpleEstimator(STEstimator):
-    def as_pipeline(self):
-        return STPipeline([(name_estimator(self), self)])
-        
-class STPipeline(STEstimator, Pipeline):
-    def as_pipeline(self):
-        return self
     
     def __rshift__(self, other):
         '''
         self >> other
         '''
-        other = as_pipeline(other)
-        steps = self.steps + other.steps
-        names = [step[0] for step in steps]
-        estimators = [step[1] for step in steps]
-        return STPipeline(zip(combine_named_estimators(names), estimators))
+        return staged(self) >> other
+        
+    def __rrshift__(self, other):
+        '''
+        other >> self
+        '''
+        return staged(other) >> self
+        
+    def __lshift__(self, other):
+        '''
+        self << other
+        '''
+        return staged(other) >> self
+        
+    def __rlshift__(self, other):
+        '''
+        other << self
+        '''
+        return staged(self) >> other
+
+#     def as_pipeline(self):
+#         return STPipeline([(name_estimator(self), self)])
+        
+# class STPipeline(STEstimator, Pipeline):
+#     def as_pipeline(self):
+#         return self
+#     
+#     def __rshift__(self, other):
+#         '''
+#         self >> other
+#         '''
+#         other = as_pipeline(other)
+#         steps = self.steps + other.steps
+#         names = [step[0] for step in steps]
+#         estimators = [step[1] for step in steps]
+#         return STPipeline(zip(combine_named_estimators(names), estimators))
 
 #         
 class _BasicDelegateDescriptor(object):
@@ -225,6 +317,22 @@ class DelegatingEstimator(BaseDelegatingEstimator):
     def __init__(self, estimator):
         self.estimator = estimator
 
+class EstimatorStage(DelegatingEstimator):
+    def __init__(self, estimator, method_args):
+        self.estimator = estimator
+        self._create_delegates('estimator', standard_methods)
+        
+    def update(self, data):
+        '''
+        Update data in place to pass to the next stage in a pipeline.
+        '''
+class TransformerStage(EstimatorStage):
+    def update(self, data):
+        data['X'] = self.transform(**data)
+        
+# class ConcatenatingResponseStage(EstimatorStage):
+#     def update(self, data):
+#         data[''] = self.transform(**data)
 class AlreadyFittedEstimator(DelegatingEstimator):
     def __init__(self, estimator):
         self.estimator = estimator
@@ -233,15 +341,16 @@ class AlreadyFittedEstimator(DelegatingEstimator):
     
     def fit(self, X, y=None, sample_weight=None, exposure=None):
         return self
-    
-def mask_estimator(estimator, mask):
-    try:
-        return estimator.mask(mask)
-    except AttributeError:
-        return MultipleResponseEstimator([(name_estimator(estimator), mask, estimator)])
+#     
+# def mask_estimator(estimator, mask):
+#     return MaskedEstimator(estimator, mask)
+#     try:
+#         return estimator.mask(mask)
+#     except AttributeError:
+#         return MultipleResponseEstimator([(name_estimator(estimator), mask, estimator)])
 
-def is_masked(estimator):
-    return isinstance(estimator, MultipleResponseEstimator)
+# def is_masked(estimator):
+#     return isinstance(estimator, MultipleResponseEstimator)
 
 def compatible_masks(masks):
     # (min, max)
@@ -269,94 +378,221 @@ def convert_mask(mask):
     else:
         return mask
 
-class MultipleResponseEstimator(STSimpleEstimator, MetaEstimatorMixin):
+class MaskedEstimator(STSimpleEstimator, MetaEstimatorMixin):
+    def __init__(self, estimator, mask):
+        self.estimator = estimator
+        self.mask = convert_mask(mask)
+    
+    def _mask_y(self, y):
+        if y is None:
+            return None
+        result = y[:, self.mask]
+        if len(result) == 0:
+            return None
+        return result
+    
+    def fit(self, X, y=None, sample_weight=None, exposure=None):
+        data = self._process_args(X=X, y=self._mask_y(y), sample_weight=sample_weight,
+                                  exposure=exposure)
+        if len(data['y'].shape) > 1 and data['y'].shape[1] == 1:
+            data['y'] = np.ravel(data['y'])
+        self.estimator_ = clone(self.estimator).fit(**data)
+        return self
+        
+    @if_delegate_has_method('estimator')
+    def score(self, X, y=None, sample_weight=None, exposure=None):
+        data = self._process_args(X=X, y=self._mask_y(y), sample_weight=sample_weight,
+                                  exposure=exposure)
+        return self.estimator_.score(**data)
+    
+    @if_delegate_has_method('estimator')
+    def predict(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        return self.estimator_.predict(**data)
+    
+    @if_delegate_has_method('estimator')
+    def predict_proba(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        return self.estimator_.predict_proba(**data)
+    
+    @if_delegate_has_method('estimator')
+    def predict_log_proba(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        return self.estimator_.predict_log_proba(**data)
+    
+    @if_delegate_has_method('estimator')
+    def decision_function(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        return self.estimator_.decision_function(**data)
+        
+class MultiEstimator(STSimpleEstimator, MetaEstimatorMixin):
     def __init__(self, estimators):
-        names = [est[0] for est in estimators]
-        masks = [convert_mask(est[1]) for est in estimators]
-        if not compatible_masks(masks):
-            raise ValueError('Masks do not have compatible sizes')
-        estimators_ = [est[2] for est in estimators]
-        self.estimators = zip(names, masks, estimators_)
+        self.estimators = estimators
     
     def __and__(self, other):
-        other = mask_estimator(other, slice(None))
-        all_estimators = self.estimators + other.estimators
-        names = [est[0] for est in all_estimators]
-        masks = [est[1] for est in all_estimators]
-        estimators = [est[2] for est in all_estimators]
-        names = combine_named_estimators(names)
-        if not compatible_masks(masks):
-            raise ValueError('Masks do not have compatible sizes')
-        return MultipleResponseEstimator(zip(names, masks, estimators))
-        
-    def mask(self, mask):
-        assert mask == slice(None)
-        return self
-    
-    def _masks(self):
-        return [mask for _, mask, _ in self.estimators]
-    
-    @property
-    def _estimator_type(self):
-        if all([is_classifier(estimator) for estimator in self.estimators.values()]):
-            return 'classifier'
-        elif all([is_regressor(estimator) for estimator in self.estimators.values()]):
-            return 'regressor'
+        new_estimators = [est for est in self.estimators]
+        if isinstance(other, MultiEstimator):
+            new_estimators += other.estimators
         else:
-            return 'mixed'
-    
-    def fit(self, X, y, fit_args=None, *args, **kwargs):
-        if fit_args is None:
-            fit_args = {}
+            new_estimators += [other]
+        return MultiEstimator(new_estimators)
+            
+    def fit(self, X, y=None, sample_weight=None, exposure=None):
+        args = self._process_args(X=X, y=y, sample_weight=sample_weight,
+                                  exposure=exposure)
         self.estimators_ = []
-        for name, columns, model in self.estimators:
-            dargs = kwargs.copy()
-            dargs.update(fit_args.get(name, {}))
-            
-            # Select the appropriate columns
-            y_ = y[:, columns]
-            if y_.shape[1] == 1:
-                y_ = y_[:, 0]
-            
-            # Fit the estimator
-            self.estimators_.append((name, columns, clone(model).fit(X, y_, *args, **dargs)))
-        self.estimators_dict_ = {name: (columns, model) for name, columns, model in self.estimators_}
-        
-        # Do a prediction on a single row of data for each estimator in order to 
-        # determine the number of predicted columns for each one
-        X_ = X[0:1, :]
-        self.prediction_columns_ = []
-        for name, columns, model in self.estimators_:
-            prediction = model.predict(X_)
-            if len(prediction.shape) > 1:
-                n_columns = prediction.shape[1]
-            else:
-                n_columns = 1
-            self.prediction_columns_ += [name] * n_columns
-        
+        for estimator in self.estimators:
+            self.estimators_.append(clone(estimator).fit(**args))
         return self
     
-    def predict(self, X, predict_args=None, *args, **kwargs):
-        if predict_args is None:
-            predict_args = {}
-        predictions = []
-        for name, columns, model in self.estimators_:  # @UnusedVariable
-            dargs = kwargs.copy()
-            dargs.update(predict_args.get(name, {}))
-            prediction = model.predict(X, *args, **dargs)
-            predictions.append(prediction if len(prediction.shape) == 2 else prediction[:, None])
-        return np.concatenate(predictions, axis=1)
+    def predict(self, X, exposure=None):
+        args = self._process_args(X=X, exposure=exposure)
+        results = []
+        for estimator in self.estimators_:
+            result = estimator.predict(**args)
+            if len(result.shape) == 1:
+                result = result[:, None]
+            results.append(result)
+        return np.concatenate(results, axis=1)
     
-    def predict_proba(self, X, predict_args=None, *args, **kwargs):
-        if predict_args is None:
-            predict_args = {}
-        predictions = []
-        for name, columns, model in self.estimators_:  # @UnusedVariable
-            dargs = kwargs.copy()
-            dargs.update(predict_args.get(name, {}))
-            prediction = model.predict_proba(X, *args, **dargs)
-            predictions.append(prediction if len(prediction.shape) == 2 else prediction[:, None])
-        return np.concatenate(predictions, axis=1)
+    def predict_proba(self, X, exposure=None):
+        args = self._process_args(X=X, exposure=exposure)
+        results = []
+        for estimator in self.estimators_:
+            result = estimator.predict_proba(**args)
+            if len(result.shape) == 1:
+                result = result[:, None]
+            results.append(result)
+        return np.concatenate(results, axis=1)
+    
+    def predict_log_proba(self, X, exposure=None):
+        args = self._process_args(X=X, exposure=exposure)
+        results = []
+        for estimator in self.estimators_:
+            result = estimator.predict_log_proba(**args)
+            if len(result.shape) == 1:
+                result = result[:, None]
+            results.append(result)
+        return np.concatenate(results, axis=1)
+    
+    def decision_function(self, X, exposure=None):
+        args = self._process_args(X=X, exposure=exposure)
+        results = []
+        for estimator in self.estimators_:
+            result = estimator.decision_function(**args)
+            if len(result.shape) == 1:
+                result = result[:, None]
+            results.append(result)
+        return np.concatenate(results, axis=1)
+    
+    def score(self, X, y=None, sample_weight=None, exposure=None):
+        args = self._process_args(X=X, y=y, sample_weight=sample_weight, exposure=exposure)
+        results = []
+        for estimator in self.estimators_:
+            result = estimator.predict_log_proba(**args)
+            results.append(result)
+        return np.array(results, axis=1)
+    
+    
+# class UnionEstimator(STSimpleEstimator, MetaEstimatorMixin):
+#     def __init__(self, estimators):
+#         masks = [convert_mask(est[0]) for est in estimators]
+#         if not compatible_masks(masks):
+#             raise ValueError('Masks do not have compatible sizes')
+#         estimators_ = [est[1] for est in estimators]
+#         self.estimators = zip(masks, estimators_)
+#     
+#     def fit(self, X, y=None, sample_weight=None, exposure=None):
+#         args = self._process_args(X=X, y=y, sample_weight=sample_weight,
+#                                   exposure=exposure)
+#         
+    
+#     
+# class MultipleResponseEstimator(STSimpleEstimator, MetaEstimatorMixin):
+#     def __init__(self, estimators):
+#         masks = [convert_mask(est[0]) for est in estimators]
+#         if not compatible_masks(masks):
+#             raise ValueError('Masks do not have compatible sizes')
+#         estimators_ = [est[1] for est in estimators]
+#         self.estimators = zip(masks, estimators_)
+#     
+#     def __and__(self, other):
+#         other = MultipleResponseEstimator(other, slice(None))
+#         all_estimators = self.estimators + other.estimators
+#         masks = [est[0] for est in all_estimators]
+#         estimators = [est[1] for est in all_estimators]
+#         if not compatible_masks(masks):
+#             raise ValueError('Masks do not have compatible sizes')
+#         return MultipleResponseEstimator(zip(masks, estimators))
+#         
+#     def mask(self, mask):
+#         assert mask == slice(None)
+#         return self
+#     
+#     def _masks(self):
+#         return [mask for _, mask, _ in self.estimators]
+#     
+#     @property
+#     def _estimator_type(self):
+#         if all([is_classifier(estimator) for estimator in self.estimators.values()]):
+#             return 'classifier'
+#         elif all([is_regressor(estimator) for estimator in self.estimators.values()]):
+#             return 'regressor'
+#         else:
+#             return 'mixed'
+#     
+#     def fit(self, X, y, sample_weight=None, exposure=None):
+#         fit_args = self._process_args(X=X, y=y, sample_weight=sample_weight,
+#                                       exposure=exposure)
+#         self.estimators_ = []
+#         for columns, model in self.estimators:
+#             dargs = kwargs.copy()
+#             dargs.update(fit_args.get(name, {}))
+#             
+#             # Select the appropriate columns
+#             y_ = y[:, columns]
+#             if y_.shape[1] == 1:
+#                 y_ = y_[:, 0]
+#             
+#             # Fit the estimator
+#             self.estimators_.append((name, columns, clone(model).fit(X, y_, *args, **dargs)))
+#         self.estimators_dict_ = {name: (columns, model) for name, columns, model in self.estimators_}
+#         
+#         # Do a prediction on a single row of data for each estimator in order to 
+#         # determine the number of predicted columns for each one
+#         X_ = X[0:1, :]
+#         self.prediction_columns_ = []
+#         for name, columns, model in self.estimators_:
+#             prediction = model.predict(X_)
+#             if len(prediction.shape) > 1:
+#                 n_columns = prediction.shape[1]
+#             else:
+#                 n_columns = 1
+#             self.prediction_columns_ += [name] * n_columns
+#         
+#         return self
+#     
+#     def predict(self, X, predict_args=None, *args, **kwargs):
+#         if predict_args is None:
+#             predict_args = {}
+#         predictions = []
+#         for name, columns, model in self.estimators_:  # @UnusedVariable
+#             dargs = kwargs.copy()
+#             dargs.update(predict_args.get(name, {}))
+#             prediction = model.predict(X, *args, **dargs)
+#             predictions.append(prediction if len(prediction.shape) == 2 else prediction[:, None])
+#         return np.concatenate(predictions, axis=1)
+#     
+#     def predict_proba(self, X, predict_args=None, *args, **kwargs):
+#         if predict_args is None:
+#             predict_args = {}
+#         predictions = []
+#         for name, columns, model in self.estimators_:  # @UnusedVariable
+#             dargs = kwargs.copy()
+#             dargs.update(predict_args.get(name, {}))
+#             prediction = model.predict_proba(X, *args, **dargs)
+#             predictions.append(prediction if len(prediction.shape) == 2 else prediction[:, None])
+#         return np.concatenate(predictions, axis=1)
 
 
 

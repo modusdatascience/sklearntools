@@ -340,6 +340,8 @@ class ProbaPredictingEstimator(DelegatingEstimator):
     
     def fit(self, X, y, *args, **kwargs):
         self.estimator_ = clone(self.estimator)
+        if len(y.shape) > 1 and y.shape[1] == 1:
+            y = np.ravel(y)
         self.estimator_.fit(X, y, *args, **kwargs)
         return self
     

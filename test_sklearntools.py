@@ -4,7 +4,7 @@ Created on Feb 23, 2016
 @author: jason
 '''
 import numpy as np
-from sklearntools import MultipleResponseEstimator, mask_estimator
+from sklearntools import StagedEstimator, MaskedEstimator
 from sklearn.linear_model.base import LinearRegression
 from sklearn.linear_model.logistic import LogisticRegression
 from calibration import CalibratedEstimatorCV, ResponseTransformingEstimator,\
@@ -17,7 +17,8 @@ from numpy.testing.utils import assert_raises
 from glm import GLM
 import statsmodels.api as sm
 from pyearth.earth import Earth
-
+import warnings
+warnings.simplefilter("error")
 
 def sim_quantiles(taus, quantiles):
     assert quantiles.shape[1] == len(taus)
@@ -117,19 +118,19 @@ def test_multiple_response_regressor():
     X = np.random.normal(size=(m,n))
     beta1 = np.random.normal(size=(n,1))
     beta2 = np.random.normal(size=(n,1))
-        
+     
     y1 = np.dot(X, beta1)
     p2 = 1. / (1. + np.exp( - np.dot(X, beta2)))
     y2 = np.random.binomial(n=1, p=p2)
     y = np.concatenate([y1, y2], axis=1)
         
-    model = MultipleResponseEstimator([('linear', np.array([True, False], dtype=bool), LinearRegression()), 
-                                       ('logistic', np.array([False, True], dtype=bool), ProbaPredictingEstimator(LogisticRegression()))])
+    model = MaskedEstimator(LinearRegression(), [True, False]) & MaskedEstimator(ProbaPredictingEstimator(LogisticRegression()), [False, True])
+#     MultipleResponseEstimator([('linear', np.array([True, False], dtype=bool), LinearRegression()), 
+#                                        ('logistic', np.array([False, True], dtype=bool), ProbaPredictingEstimator(LogisticRegression()))])
     model.fit(X, y)
     
-    assert np.mean(beta1 - model.estimators_dict_['linear'][1].coef_) < .01
-    assert np.mean(beta2 - model.estimators_dict_['logistic'][1].estimator_.coef_) < .01
-    assert model.prediction_columns_ == ['linear', 'logistic']
+    assert np.mean(beta1 - model.estimators_[0].estimator_.coef_) < .01
+    assert np.mean(beta2 - model.estimators_[1].estimator_.estimator_.coef_) < .01
     model.get_params()
     model.predict(X)
 
@@ -143,15 +144,15 @@ def test_calibration():
     y_lin = np.dot(X, beta)
     y_clas = np.random.binomial( 1, 1. / (1. + np.exp(-y_lin)) )
     y = np.concatenate([y_lin, y_clas], axis=1)
-    estimator = mask_estimator(LinearRegression(), np.array([True, False], dtype=bool))
-    calibrator = mask_estimator(LogisticRegression(), [False, True])
+    estimator = MaskedEstimator(LinearRegression(), np.array([True, False], dtype=bool))
+    calibrator = MaskedEstimator(LogisticRegression(), [False, True])
 #     estimator = linear_regressor & calibrator
 #     MultipleResponseEstimator([('estimator', np.array([True, False], dtype=bool), LinearRegression())])
 #     calibrator = MultipleResponseEstimator([('calibrator', np.array([False, True], dtype=bool), LogisticRegression())])
     model = CalibratedEstimatorCV(estimator, calibrator)
     model.fit(X, y)
-    assert np.max(beta[:, 0] - model.estimator_.estimators_[0][2].coef_) < .000001
-    assert np.max(model.calibrator_.estimators_[0][2].coef_ - 1.) < .1
+    assert np.max(beta[:, 0] - model.estimator_.estimator_.coef_) < .000001
+    assert np.max(model.calibrator_.estimator_.coef_ - 1.) < .1
 
 def test_pipeline():
     np.random.seed(1)
@@ -168,7 +169,7 @@ def test_pipeline():
     model >>= LinearRegression()
     
     model.fit(X, y)
-    assert np.max(np.abs(model.steps[1][1].coef_ - beta_reduced)) < .1
+    assert np.max(np.abs(model.final_stage_.coef_ - beta_reduced)) < .1
 
 def test_response_transforming_estimator():
     np.random.seed(1)
@@ -211,7 +212,30 @@ def test_hazard_to_risk():
     y_pred = model.predict(X, exposure)
     assert np.abs((np.sum(y_pred) - np.sum(rate > 0)) / np.sum(rate > 0))  < .1
     assert np.max(np.abs(model.estimator_.coef_ - beta[:,0])) < .1
+
+def test_hazard_to_risk_staged():
+    np.random.seed(1)
     
+    m = 10000
+    n = 10
+    
+    # Simulate an event under constant hazard, with hazard = X * beta and 
+    # iid exponentially distributed exposure times.
+    X = np.random.normal(size=(m,n))
+    beta = np.random.normal(size=(n,1))
+    hazard = np.exp(np.dot(X, beta))
+    exposure = np.random.exponential(size=(m,1))
+    rate = np.random.poisson(hazard * exposure) / exposure
+    
+    model = CalibratedEstimatorCV(GLM(sm.families.Gaussian(sm.families.links.log), add_constant=False), 
+                                  ProbaPredictingEstimator(ThresholdClassifier(HazardToRiskEstimator(LogisticRegression()))))
+    
+    model.fit(X, rate, exposure=exposure)
+    
+    y_pred = model.predict(X, exposure)
+    assert np.abs((np.sum(y_pred) - np.sum(rate > 0)) / np.sum(rate > 0))  < .1
+    assert np.max(np.abs(model.estimator_.coef_ - beta[:,0])) < .1
+
 def test_moving_average_smoothing_estimator():
     np.random.seed(1)
     
@@ -234,7 +258,24 @@ def test_moving_average_smoothing_estimator():
     y_pred = model.predict(X, exposure)
     assert np.abs((np.sum(y_pred) - np.sum(rate > 0)) / np.sum(rate > 0))  < .1
     assert np.max(np.abs(model.estimator_.coef_ - beta[:,0])) < .1
+
+def test_staged_estimator():
+    np.random.seed(1)
+    m = 10000
+    n = 10
     
+    X = np.random.normal(size=(m,n))
+    beta = np.random.normal(size=(n,1))
+    beta[np.random.binomial(p=2.0/float(n), n=1, size=n).astype(bool)] = 0
+    y = np.dot(X, beta) + 0.5 * np.random.normal(size=(m, 1))
+    beta_reduced = beta[beta != 0]
+    
+    stage0 = BackwardEliminationEstimator(SingleEliminationFeatureImportanceEstimatorCV(LinearRegression(), check_constant_model=False)) 
+    stage1 = LinearRegression()
+    model = StagedEstimator([stage0, stage1])
+    
+    model.fit(X, y)
+    assert np.max(np.abs(model.final_stage_.coef_ - beta_reduced)) < .1
 #     
 #     y_lin = np.dot(X, beta)
 #     y_clas = np.random.binomial( 1, 1. / (1. + np.exp(-y_lin)) )
@@ -259,6 +300,7 @@ if __name__ == '__main__':
     test_response_transforming_estimator()
     test_hazard_to_risk()
     test_moving_average_smoothing_estimator()
+    test_staged_estimator()
     print 'Success!'
     
     
