@@ -6,7 +6,6 @@ from sklearn.cross_validation import check_cv
 from sklearn.externals.joblib.parallel import Parallel, delayed
 import numpy as np
 from sklearn.utils.metaestimators import if_delegate_has_method
-from math import ceil
 
 def _subset(data, idx):
     if len(data.shape) == 1:

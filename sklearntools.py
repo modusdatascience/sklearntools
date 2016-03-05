@@ -3,20 +3,11 @@ Created on Feb 11, 2016
 
 @author: jason
 '''
-from sklearn.base import BaseEstimator, clone, MetaEstimatorMixin, is_classifier,\
-    is_regressor, TransformerMixin
+from sklearn.base import BaseEstimator, clone, MetaEstimatorMixin
 import numpy as np
-from sklearn.cross_validation import check_cv, _fit_and_score
-from sklearn.metrics.scorer import check_scoring
-from sklearn.externals.joblib.parallel import Parallel, delayed
-from sklearn.pipeline import Pipeline
-from sklearn.feature_selection.base import SelectorMixin
 from sklearn.utils.metaestimators import if_delegate_has_method
-from sklearn.utils import safe_mask
 from six import with_metaclass
-from operator import attrgetter
 from functools import update_wrapper
-from types import MethodType
 
 class SklearnTool(object):
     pass
