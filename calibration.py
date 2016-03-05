@@ -177,7 +177,7 @@ class PredictorTransformer(DelegatingEstimator):
         self._create_delegates('estimator', standard_methods)
     
     def transform(self, X, exposure=None):
-        args = {}
+        args = {'X': X}
         if exposure is not None:
             args['exposure'] = exposure
         return self.predict(**args)

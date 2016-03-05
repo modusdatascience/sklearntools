@@ -154,6 +154,26 @@ def test_calibration():
     assert np.max(beta[:, 0] - model.estimator_.estimator_.coef_) < .000001
     assert np.max(model.calibrator_.estimator_.coef_ - 1.) < .1
 
+def test_predictor_transformer_calibration():
+    np.random.seed(1)
+    m = 10000
+    n = 10
+    
+    X = np.random.normal(size=(m,n))
+    beta = np.random.normal(size=(n,1))
+    y_lin = np.dot(X, beta)
+    y_clas = np.random.binomial( 1, 1. / (1. + np.exp(-y_lin)) )
+    y = np.concatenate([y_lin, y_clas], axis=1)
+    estimator = MaskedEstimator(LinearRegression(), np.array([True, False], dtype=bool))
+    calibrator = MaskedEstimator(LogisticRegression(), [False, True])
+#     estimator = linear_regressor & calibrator
+#     MultipleResponseEstimator([('estimator', np.array([True, False], dtype=bool), LinearRegression())])
+#     calibrator = MultipleResponseEstimator([('calibrator', np.array([False, True], dtype=bool), LogisticRegression())])
+    model = PredictorTransformer(estimator) >> calibrator
+    model.fit(X, y)
+    assert np.max(beta[:, 0] - model.intermediate_stages_[0].estimator_.estimator_.coef_) < .000001
+    assert np.max(model.final_stage_.estimator_.coef_ - 1.) < .1
+    
 def test_pipeline():
     np.random.seed(1)
     m = 10000
@@ -296,6 +316,7 @@ if __name__ == '__main__':
     test_backward_elimination_estimation()
     test_multiple_response_regressor()
     test_calibration()
+    test_predictor_transformer_calibration()
     test_pipeline()
     test_response_transforming_estimator()
     test_hazard_to_risk()
