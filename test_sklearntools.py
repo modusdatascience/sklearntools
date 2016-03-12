@@ -348,19 +348,23 @@ def test_column_subset_transformer():
     np.testing.assert_array_equal(args_['sample_weight'], X[:, sample_weight_cols])
     np.testing.assert_array_equal(args_['exposure'], X[:, exposure_cols])
     
-
+    lin = ColumnSubsetTransformer(x_cols=x_cols_, y_cols=y_cols_) >> LinearRegression()
+    lin.fit(X_)
+    lin.predict(X_.loc[:, x_cols_])
+    lin.score(X_)
+    
 if __name__ == '__main__':
-    test_quantile_regression()
-    test_single_elimination_feature_importance_estimator_cv()
-    test_backward_elimination_estimation()
-    test_multiple_response_regressor()
-    test_calibration()
-    test_predictor_transformer_calibration()
-    test_pipeline()
-    test_response_transforming_estimator()
-    test_hazard_to_risk()
-    test_moving_average_smoothing_estimator()
-    test_staged_estimator()
+#     test_quantile_regression()
+#     test_single_elimination_feature_importance_estimator_cv()
+#     test_backward_elimination_estimation()
+#     test_multiple_response_regressor()
+#     test_calibration()
+#     test_predictor_transformer_calibration()
+#     test_pipeline()
+#     test_response_transforming_estimator()
+#     test_hazard_to_risk()
+#     test_moving_average_smoothing_estimator()
+#     test_staged_estimator()
     test_column_subset_transformer()
     print 'Success!'
     

@@ -99,7 +99,7 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
         return result
     
     def _update(self, data):
-        for stage in enumerate(self.intermediate_stages_):
+        for stage in self.intermediate_stages_:
             try:
                 # Stage knows to discard whatever it doesn't need
                 stage.update(data)
@@ -409,7 +409,13 @@ class ColumnSubsetTransformer(STSimpleEstimator):
         X = args['X']
         for key, cols in keys.items():
             if cols is not None:
-                args[key] = np.asarray(safe_col_select(X, cols))
+                try:
+                    args[key] = np.asarray(safe_col_select(X, cols))
+                except KeyError:
+                    if key in {'X', 'exposure'}:
+                        raise
+                    else:
+                        pass
     
 class MaskedEstimator(STSimpleEstimator, MetaEstimatorMixin):
     def __init__(self, estimator, mask):
