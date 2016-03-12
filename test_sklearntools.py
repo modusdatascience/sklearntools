@@ -4,7 +4,8 @@ Created on Feb 23, 2016
 @author: jason
 '''
 import numpy as np
-from sklearntools import StagedEstimator, MaskedEstimator
+from sklearntools import StagedEstimator, MaskedEstimator,\
+    ColumnSubsetTransformer
 from sklearn.linear_model.base import LinearRegression
 from sklearn.linear_model.logistic import LogisticRegression
 from calibration import CalibratedEstimatorCV, ResponseTransformingEstimator,\
@@ -18,6 +19,7 @@ from glm import GLM
 import statsmodels.api as sm
 from pyearth.earth import Earth
 import warnings
+import pandas
 warnings.simplefilter("error")
 
 def sim_quantiles(taus, quantiles):
@@ -310,6 +312,43 @@ def test_staged_estimator():
 #     assert np.max(beta[:, 0] - model.estimator_.estimators_[0][2].coef_) < .000001
 #     assert np.max(model.calibrator_.estimators_[0][2].coef_ - 1.) < .1
 
+def test_column_subset_transformer():
+    m = 1000
+    n = 10
+    X = np.random.normal(size=(m,n))
+    x_cols = [0,3,4,5]
+    y_cols = 9
+    sample_weight_cols = 8
+    exposure_cols = 7
+    
+    subsetter1 = ColumnSubsetTransformer(x_cols=x_cols, y_cols=y_cols, 
+                                         sample_weight_cols=sample_weight_cols,
+                                         exposure_cols=exposure_cols)
+    np.testing.assert_array_equal(subsetter1.transform(X), X[:, x_cols])
+    args = {'X': X}
+    subsetter1.update(args)
+    np.testing.assert_array_equal(args['X'], X[:, x_cols])
+    np.testing.assert_array_equal(args['y'], X[:, y_cols])
+    np.testing.assert_array_equal(args['sample_weight'], X[:, sample_weight_cols])
+    np.testing.assert_array_equal(args['exposure'], X[:, exposure_cols])
+    
+    X_ = pandas.DataFrame(X, columns=['x%d' % n for n in range(10)])
+    x_cols_ = ['x%d' % n for n in x_cols]
+    y_cols_ = 'x%d' % y_cols
+    sample_weight_cols_ = 'x%d' % sample_weight_cols
+    exposure_cols_ = 'x%d' % exposure_cols
+    subsetter2 = ColumnSubsetTransformer(x_cols=x_cols_, y_cols=y_cols_, 
+                                         sample_weight_cols=sample_weight_cols_,
+                                         exposure_cols=exposure_cols_)
+    np.testing.assert_array_equal(subsetter2.transform(X_), X[:, x_cols])
+    args_ = {'X': X_}
+    subsetter2.update(args_)
+    np.testing.assert_array_equal(args_['X'], X[:, x_cols])
+    np.testing.assert_array_equal(args_['y'], X[:, y_cols])
+    np.testing.assert_array_equal(args_['sample_weight'], X[:, sample_weight_cols])
+    np.testing.assert_array_equal(args_['exposure'], X[:, exposure_cols])
+    
+
 if __name__ == '__main__':
     test_quantile_regression()
     test_single_elimination_feature_importance_estimator_cv()
@@ -322,6 +361,7 @@ if __name__ == '__main__':
     test_hazard_to_risk()
     test_moving_average_smoothing_estimator()
     test_staged_estimator()
+    test_column_subset_transformer()
     print 'Success!'
     
     

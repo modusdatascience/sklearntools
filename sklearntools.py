@@ -8,6 +8,7 @@ import numpy as np
 from sklearn.utils.metaestimators import if_delegate_has_method
 from six import with_metaclass
 from functools import update_wrapper
+from inspect import getargspec
 
 class SklearnTool(object):
     pass
@@ -61,6 +62,14 @@ class STEstimator(BaseEstimator, SklearnTool):
         '''
         return MultiEstimator([other]) & self
 
+def safe_call(fn, args):
+    spec = getargspec(fn)
+    if spec.keywords is not None:
+        return fn(**args)
+    else:
+        safe_args = {arg: args[arg] for arg in spec.args[1:] if arg in args}
+        return fn(**safe_args)
+
 class StagedEstimator(STEstimator, MetaEstimatorMixin):
     def __init__(self, stages):
         self.stages = stages
@@ -95,7 +104,7 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
                 # Stage knows to discard whatever it doesn't need
                 stage.update(data)
             except AttributeError:
-                data['X'] = stage.transform(**self._transform_args(data))
+                data['X'] = safe_call(stage.transform, self._transform_args(data))
     
     def fit(self, X, y=None, sample_weight=None, exposure=None):
         data = self._process_args(X=X, y=y, sample_weight=sample_weight, exposure=exposure)
@@ -103,39 +112,39 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
         for stage in self.intermediate_stages:
             # Stage knows to discard whatever it doesn't need
             stage_ = clone(stage)
-            stage_.fit(**data)
+            safe_call(stage_.fit, data)
             try:
                 stage_.update(data)
             except AttributeError:
-                data['X'] = stage_.transform(**self._transform_args(data))
+                data['X'] = safe_call(stage_.transform, self._transform_args(data))
             self.intermediate_stages_.append(stage_)
-        self.final_stage_ = clone(self.final_stage).fit(**data)
+        self.final_stage_ = safe_call(clone(self.final_stage).fit, data)
         return self
     
     def predict(self, X, exposure=None):
         data = self._process_args(X=X, exposure=exposure)
         self._update(data)
-        return self.final_stage_.predict(**data)
+        return safe_call(self.final_stage_.predict, data)
     
     def predict_proba(self, X, exposure=None):
         data = self._process_args(X=X, exposure=exposure)
         self._update(data)
-        return self.final_stage_.predict_proba(**data)
+        return safe_call(self.final_stage_.predict_proba, data)
     
     def predict_log_proba(self, X, exposure=None):
         data = self._process_args(X=X, exposure=exposure)
         self._update(data)
-        return self.final_stage_.predict_log_proba(**data)
+        return safe_call(self.final_stage_.predict_log_proba, data)
     
     def score(self, X, y=None, sample_weight=None, exposure=None):
         data = self._process_args(X=X, exposure=exposure)
         self._update(data)
-        return self.final_stage_.score(**data)
+        return safe_call(self.final_stage_.score, data)
     
     def decision_function(self, X, exposure=None):
         data = self._process_args(X=X, exposure=exposure)
         self._update(data)
-        return self.final_stage_.decision_function(**data)
+        return safe_call(self.final_stage_.decision_function, data)
 
 def staged(estimator):
     return StagedEstimator([estimator])
@@ -369,6 +378,39 @@ def convert_mask(mask):
     else:
         return mask
 
+def safe_col_select(data, cols):
+    if hasattr(data, 'loc'):
+        return data.loc[:, cols]
+    else:
+        return data[:, cols]
+        
+
+class ColumnSubsetTransformer(STSimpleEstimator):
+    '''
+    Takes all data from X and splits it into X, y, sample_weight, and exposure.  Use with 
+    StagedEstimator.  If used as transformer, only gives X (with appropriate subset of columns).
+    '''
+    def __init__(self, x_cols=slice(None), y_cols=None,
+                  sample_weight_cols=None, exposure_cols=None):
+        self.x_cols = x_cols
+        self.y_cols = y_cols
+        self.sample_weight_cols = sample_weight_cols
+        self.exposure_cols = exposure_cols
+        
+    def fit(self, X=None, y=None, sample_weight=None, exposure=None):
+        return self
+    
+    def transform(self, X=None, y=None, sample_weight=None, exposure=None):
+        return np.asarray(safe_col_select(X, self.x_cols))
+    
+    def update(self, args):
+        keys = {'X':self.x_cols, 'y':self.y_cols, 'sample_weight':self.sample_weight_cols, 
+                'exposure':self.exposure_cols}
+        X = args['X']
+        for key, cols in keys.items():
+            if cols is not None:
+                args[key] = np.asarray(safe_col_select(X, cols))
+    
 class MaskedEstimator(STSimpleEstimator, MetaEstimatorMixin):
     def __init__(self, estimator, mask):
         self.estimator = estimator
