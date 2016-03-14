@@ -5,7 +5,7 @@ Created on Feb 23, 2016
 '''
 import numpy as np
 from sklearntools import StagedEstimator, MaskedEstimator,\
-    ColumnSubsetTransformer
+    ColumnSubsetTransformer, NonNullSubsetFitter
 from sklearn.linear_model.base import LinearRegression
 from sklearn.linear_model.logistic import LogisticRegression
 from calibration import CalibratedEstimatorCV, ResponseTransformingEstimator,\
@@ -429,6 +429,25 @@ def test_model_selector_cv():
     model.fit(X, rate, exposure=exposure)
     np.testing.assert_array_equal(model.best_estimator_.intermediate_stages_[0].x_cols, best_subset)
 
+def test_non_null_row_subset_fitter():
+    np.random.seed(1)
+    
+    m = 10000
+    n = 10
+    
+    # Simulate an event under constant hazard, with hazard = X * beta and 
+    # iid exponentially distributed exposure times.
+    X = np.random.normal(size=(m,n))
+    beta = np.random.normal(size=(n,1))
+    y = np.ravel(np.dot(X, beta))
+    
+    missing = np.random.binomial(p=.001, n=1, size=(m,n)) == 1
+    X[missing] = None
+    
+    model = NonNullSubsetFitter(LinearRegression())
+    model.fit(X, y)
+    assert np.max(np.abs(np.ravel(beta) - model.estimator_.coef_)) < .001
+
 if __name__ == '__main__':
     test_quantile_regression()
     test_single_elimination_feature_importance_estimator_cv()
@@ -445,6 +464,7 @@ if __name__ == '__main__':
     test_staged_estimator()
     test_column_subset_transformer()
     test_model_selector_cv()
+    test_non_null_row_subset_fitter()
     print 'Success!'
     
     

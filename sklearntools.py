@@ -451,20 +451,39 @@ class BaseRowSubsetTransformer(STSimpleEstimator):
         for k in data.keys():
             data[k] = _subset(data[k], rows)
 
+class BaseRowSubsetFitter(DelegatingEstimator):
+    def __init__(self, estimator):
+        self.estimator = estimator
+        self._create_delegates('estimator', standard_methods)
+    
+    def fit(self, X, y=None, sample_weight=None, exposure=None):
+        data = self._process_args(X=X, y=y, sample_weight=sample_weight, 
+                                  exposure=exposure)
+        self.estimator_ = clone(self.estimator).fit(**(_subset_data(data, self._predicate(data))))
+        return self
+    
 def non_null_rows(arr):
     if hasattr(arr, 'notnull'):
         return arr.notnull().any(axis=1)
     else:
-        return ~(np.isnan(arr).all(axis=1))
+        return ~(np.isnan(arr).any(axis=1))
 
-class NonMissingRowSubsetTransformer(STSimpleEstimator):
-    def _predicate(self, data):
+def non_null_rows_dict(data):
+    result = None
+    for v in data.values():
+        if result is None:
+            result = np.ones(shape=v.shape[0], dtype=bool)
+        result &= non_null_rows(v)
+    if result is None:
         result = slice(None)
-        for v in data.values():
-            if result == slice(None):
-                result = np.zeros(shape=v.shape[0], dtype=bool)
-            result &= non_null_rows(v)
-        return result
+    return result
+
+class NonMissingRowSubsetMixin(object):
+    def _predicate(self, data):
+        return non_null_rows_dict(data)
+    
+class NonNullSubsetFitter(BaseRowSubsetFitter, NonMissingRowSubsetMixin):
+    pass
     
 class ColumnSubsetTransformer(STSimpleEstimator):
     '''
