@@ -10,6 +10,15 @@ from six import with_metaclass
 from functools import update_wrapper
 from inspect import getargspec
 
+def _subset(data, idx):
+    if len(data.shape) == 1:
+        return data[idx]
+    else:
+        if hasattr(data, 'loc'):
+            return data.loc[idx, :]
+        else:
+            return data[idx, :]
+        
 class SklearnTool(object):
     pass
 # 
@@ -120,6 +129,11 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
             self.intermediate_stages_.append(stage_)
         self.final_stage_ = safe_call(clone(self.final_stage).fit, data)
         return self
+    
+    def transform(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        self._update(data)
+        return safe_call(self.final_stage_.transform, data)
     
     def predict(self, X, exposure=None):
         data = self._process_args(X=X, exposure=exposure)
@@ -385,6 +399,39 @@ def safe_col_select(data, cols):
         return data[:, cols]
         
 
+class BaseRowSubsetTransformer(STSimpleEstimator):
+    '''
+    Removes some rows for whatever reason.
+    '''
+    def fit(self, X=None, y=None, sample_weight=None, exposure=None):
+        return self
+    
+    def transform(self, X=None, y=None, sample_weight=None, exposure=None):
+        data = self._process_args(X=X, y=y, sample_weight=sample_weight, 
+                                  exposure=exposure)
+        rows = self._predicate(data)
+        return _subset(X, rows)
+    
+    def update(self, data):
+        rows = self._predicate(data)
+        for k in data.keys():
+            data[k] = _subset(data[k], rows)
+
+def non_null_rows(arr):
+    if hasattr(arr, 'notnull'):
+        return arr.notnull().any(axis=1)
+    else:
+        return ~(np.isnan(arr).all(axis=1))
+
+class NonMissingRowSubsetTransformer(STSimpleEstimator):
+    def _predicate(self, data):
+        result = slice(None)
+        for v in data.values():
+            if result == slice(None):
+                result = np.zeros(shape=v.shape[0], dtype=bool)
+            result &= non_null_rows(v)
+        return result
+    
 class ColumnSubsetTransformer(STSimpleEstimator):
     '''
     Takes all data from X and splits it into X, y, sample_weight, and exposure.  Use with 
@@ -401,7 +448,7 @@ class ColumnSubsetTransformer(STSimpleEstimator):
         return self
     
     def transform(self, X=None, y=None, sample_weight=None, exposure=None):
-        return np.asarray(safe_col_select(X, self.x_cols))
+        return safe_col_select(X, self.x_cols)
     
     def update(self, args):
         keys = {'X':self.x_cols, 'y':self.y_cols, 'sample_weight':self.sample_weight_cols, 
@@ -410,7 +457,7 @@ class ColumnSubsetTransformer(STSimpleEstimator):
         for key, cols in keys.items():
             if cols is not None:
                 try:
-                    args[key] = np.asarray(safe_col_select(X, cols))
+                    args[key] = safe_col_select(X, cols)
                 except KeyError:
                     if key in {'X', 'exposure'}:
                         raise
@@ -483,6 +530,16 @@ class MultiEstimator(STSimpleEstimator, MetaEstimatorMixin):
         for estimator in self.estimators:
             self.estimators_.append(clone(estimator).fit(**args))
         return self
+    
+    def transform(self, X, y=None, sample_weight=None, exposure=None):
+        args = self._process_args(X=X, exposure=exposure)
+        results = []
+        for estimator in self.estimators_:
+            result = estimator.transform(**args)
+            if len(result.shape) == 1:
+                result = result[:, None]
+            results.append(result)
+        return np.concatenate(results, axis=1)
     
     def predict(self, X, exposure=None):
         args = self._process_args(X=X, exposure=exposure)

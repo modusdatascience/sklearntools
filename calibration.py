@@ -1,17 +1,11 @@
 from sklearntools import STSimpleEstimator, DelegatingEstimator, non_fit_methods,\
-    standard_methods
+    standard_methods, _subset
 from sklearn.base import MetaEstimatorMixin, is_classifier, clone,\
     TransformerMixin
 from sklearn.cross_validation import check_cv
 from sklearn.externals.joblib.parallel import Parallel, delayed
 import numpy as np
 from sklearn.utils.metaestimators import if_delegate_has_method
-
-def _subset(data, idx):
-    if len(data.shape) == 1:
-        return data[idx]
-    else:
-        return data[idx, :]
 
 def _fit_and_predict(estimator, X, y, train, test, sample_weight=None, exposure=None):
     '''
@@ -207,7 +201,7 @@ class CalibratedEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
     def _estimator_type(self):
         return self.calibrator._estimator_type
     
-    def fit(self, X, y, sample_weight=None, exposure=None):
+    def fit(self, X, y=None, sample_weight=None, exposure=None):
         if self.cv == 1:
             cv = no_cv(X=X, y=y)
         else:
@@ -216,7 +210,9 @@ class CalibratedEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
                         pre_dispatch=self.pre_dispatch)
         
         # Fit the estimator on each train set and predict with it on each test set
-        fit_args = {'X': X, 'y': y}
+        fit_args = {'X': X}
+        if y is not None:
+            fit_args['y'] = y
         if self.est_weight and sample_weight is not None:
             fit_args['sample_weight'] = sample_weight
         if self.est_exposure and exposure is not None:
