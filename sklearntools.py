@@ -10,8 +10,33 @@ from six import with_metaclass
 from functools import update_wrapper
 from inspect import getargspec
 
+def safe_call(fn, args):
+    spec = getargspec(fn)
+    if spec.keywords is not None:
+        return fn(**args)
+    else:
+        safe_args = {arg: args[arg] for arg in spec.args[1:] if arg in args}
+        return fn(**safe_args)
 
-
+def safer_call(fn, *args, **kwargs):
+    kwargs = kwargs.copy()
+    try:
+        spec = getargspec(fn)
+    except TypeError:
+        spec = getargspec(fn.__call__)
+    spec_args = list(spec.args)
+    if spec_args[0] == 'self':
+        spec_args = spec_args[1:]
+    if spec.varargs is None:
+        for i, arg in enumerate(args):
+            name = spec_args[i]
+            kwargs[name] = arg
+            args = []
+    if spec.keywords is None:
+        for name in list(kwargs.keys()):
+            if name not in spec_args:
+                del kwargs[name]
+    return fn(*args, **kwargs)
 
 def _subset(data, idx):
     if len(data.shape) == 1:
@@ -32,7 +57,7 @@ def _fit_and_score(estimator, data, scorer, train, test):
     train_data = _subset_data(data, train)
     estimator_ = clone(estimator).fit(**train_data)
     test_data = _subset_data(data, test)
-    score = scorer(estimator_, **test_data)
+    score = safer_call(scorer, estimator_, **test_data)
     return (score, np.sum(test))
 
 class SklearnTool(object):
@@ -87,13 +112,6 @@ class STEstimator(BaseEstimator, SklearnTool):
         '''
         return MultiEstimator([other]) & self
 
-def safe_call(fn, args):
-    spec = getargspec(fn)
-    if spec.keywords is not None:
-        return fn(**args)
-    else:
-        safe_args = {arg: args[arg] for arg in spec.args[1:] if arg in args}
-        return fn(**safe_args)
 
 class StagedEstimator(STEstimator, MetaEstimatorMixin):
     def __init__(self, stages):

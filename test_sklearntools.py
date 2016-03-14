@@ -21,6 +21,8 @@ import statsmodels.api as sm
 from pyearth.earth import Earth
 import warnings
 import pandas
+from model_selection import ModelSelectorCV
+from sklearn.metrics import log_loss
 warnings.simplefilter("error")
 
 def sim_quantiles(taus, quantiles):
@@ -398,7 +400,36 @@ def test_column_subset_transformer():
     lin.fit(X_)
     lin.predict(X_.loc[:, x_cols_])
     lin.score(X_)
+
+def test_model_selector_cv():
+    np.random.seed(1)
     
+    m = 10000
+    n = 10
+    
+    # Simulate an event under constant hazard, with hazard = X * beta and 
+    # iid exponentially distributed exposure times.
+    X = np.random.normal(size=(m,n))
+    beta = np.random.normal(size=(n,1))
+    hazard = np.exp(np.dot(X, beta))
+    exposure = np.random.exponential(size=(m,1))
+    rate = np.random.poisson(hazard * exposure) / exposure
+    best_subset = np.ravel(np.argsort(np.abs(beta))[::-1][:3])
+    worst_subset = np.ravel(np.argsort(np.abs(beta))[:3])
+    
+    basic_model = CalibratedEstimatorCV(GLM(sm.families.Gaussian(sm.families.links.log), add_constant=False), 
+                                  ProbaPredictingEstimator(ThresholdClassifier(HazardToRiskEstimator(LogisticRegression()))))
+
+    model1 = ColumnSubsetTransformer(x_cols=best_subset) >> basic_model
+    model2 = ColumnSubsetTransformer(x_cols=worst_subset) >> basic_model
+    def log_loss_scorer(clf, X, y, **kwargs):
+        y_pred = clf.predict(X, **kwargs)
+        return log_loss(y>0, y_pred)
+    model = ModelSelectorCV([model1, model2], scoring=log_loss_scorer)
+#     
+    model.fit(X, rate, exposure=exposure)
+    np.testing.assert_array_equal(model.best_estimator_.intermediate_stages_[0].x_cols, best_subset)
+
 if __name__ == '__main__':
     test_quantile_regression()
     test_single_elimination_feature_importance_estimator_cv()
@@ -414,6 +445,7 @@ if __name__ == '__main__':
     test_moving_average_smoothing_estimator()
     test_staged_estimator()
     test_column_subset_transformer()
+    test_model_selector_cv()
     print 'Success!'
     
     
