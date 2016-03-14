@@ -10,6 +10,9 @@ from six import with_metaclass
 from functools import update_wrapper
 from inspect import getargspec
 
+
+
+
 def _subset(data, idx):
     if len(data.shape) == 1:
         return data[idx]
@@ -18,7 +21,20 @@ def _subset(data, idx):
             return data.loc[idx, :]
         else:
             return data[idx, :]
-        
+
+def _subset_data(data, idx):
+    result = {}
+    for k in data.keys():
+        result[k] = _subset(data[k], idx)
+    return result
+
+def _fit_and_score(estimator, data, scorer, train, test):
+    train_data = _subset_data(data, train)
+    estimator_ = clone(estimator).fit(**train_data)
+    test_data = _subset_data(data, test)
+    score = scorer(estimator_, **test_data)
+    return (score, np.sum(test))
+
 class SklearnTool(object):
     pass
 # 
@@ -286,7 +302,7 @@ predict_methods = ['predict', 'predict_proba', 'decision_function',
 class BaseDelegatingEstimator(with_metaclass(DelegatingMetaClass, STSimpleEstimator, MetaEstimatorMixin)):
     def _create_delegates(self, name, method_names):
         if not hasattr(self, '_delegates'):
-            self.delegates = {}
+            self._delegates = {}
         delegate_ = getattr(self, name)
         methods = [method for method in method_names if callable(getattr(delegate_, method, None))]
         for method in methods:

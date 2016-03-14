@@ -13,7 +13,8 @@ from calibration import CalibratedEstimatorCV, ResponseTransformingEstimator,\
     MovingAverageSmoothingEstimator, ThresholdClassifier, ProbaPredictingEstimator
 from quantile import QuantileRegressor
 from feature_selection import SingleEliminationFeatureImportanceEstimatorCV,\
-    BackwardEliminationEstimator
+    BackwardEliminationEstimator, UnivariateFeatureImportanceEstimatorCV,\
+    BestKFeatureSelector
 from numpy.testing.utils import assert_raises
 from glm import GLM
 import statsmodels.api as sm
@@ -87,6 +88,51 @@ def test_single_elimination_feature_importance_estimator_cv():
     fitted_sequence = np.ravel(np.argsort(model1.feature_importances_, axis=0))
     
     np.testing.assert_array_equal(fitted_sequence, target_sequence)
+
+def test_univariate_feature_importance_estimator_cv():
+    np.random.seed(0)
+    m = 100000
+    n = 6
+    factor = .9
+    
+    X = np.random.normal(size=(m,n))
+    beta = 100 * np.ones(shape=n)
+    for i in range(1, n):
+        beta[i] = factor * beta[i-1]
+    beta = np.random.permutation(beta)[:,None]
+    
+    y = np.dot(X, beta) + 0.01 * np.random.normal(size=(m, 1))
+    
+    target_sequence = np.ravel(np.argsort(beta ** 2, axis=0))
+    model1 = UnivariateFeatureImportanceEstimatorCV(LinearRegression())
+    model1.fit(X, y)
+    fitted_sequence = np.ravel(np.argsort(model1.feature_importances_, axis=0))
+    
+    np.testing.assert_array_equal(fitted_sequence, target_sequence)
+
+def test_k_best_feature_selector():
+    np.random.seed(0)
+    m = 100000
+    n = 6
+    factor = .9
+    
+    X = np.random.normal(size=(m,n))
+    beta = 100 * np.ones(shape=n)
+    for i in range(1, n):
+        beta[i] = factor * beta[i-1]
+    beta = np.random.permutation(beta)[:,None]
+#     beta = np.random.normal(size=(n,1))
+    
+    y = np.dot(X, beta) + 0.01 * np.random.normal(size=(m, 1))
+    
+    target_vars = np.ravel(np.argsort(beta ** 2, axis=0))[::-1][:3]
+    target_support = np.zeros(shape=n, dtype=bool)
+    target_support[target_vars] = True
+    
+    model1 = BestKFeatureSelector(UnivariateFeatureImportanceEstimatorCV(LinearRegression()), k=3)
+    model1.fit(X, y)
+    
+    np.testing.assert_array_equal(model1.support_, target_support)
     
 def test_backward_elimination_estimation():
     np.random.seed(0)
@@ -104,7 +150,7 @@ def test_backward_elimination_estimation():
     y = np.dot(X, beta) + 0.01 * np.random.normal(size=(m, 1))
     
     target_sequence = np.ravel(np.argsort(beta ** 2, axis=0))
-    model1 = BackwardEliminationEstimator(SingleEliminationFeatureImportanceEstimatorCV(LinearRegression(), check_constant_model=False))
+    model1 = BackwardEliminationEstimator(SingleEliminationFeatureImportanceEstimatorCV(LinearRegression()))
     model1.fit(X, y)
     
 #     model2 = BRFE(FeatureImportanceEstimatorCV(LinearRegression()))
@@ -187,7 +233,7 @@ def test_pipeline():
     y = np.dot(X, beta) + 0.5 * np.random.normal(size=(m, 1))
     beta_reduced = beta[beta != 0]
     
-    model = BackwardEliminationEstimator(SingleEliminationFeatureImportanceEstimatorCV(LinearRegression(), check_constant_model=False)) 
+    model = BackwardEliminationEstimator(SingleEliminationFeatureImportanceEstimatorCV(LinearRegression())) 
     model >>= LinearRegression()
     
     model.fit(X, y)
@@ -292,7 +338,7 @@ def test_staged_estimator():
     y = np.dot(X, beta) + 0.5 * np.random.normal(size=(m, 1))
     beta_reduced = beta[beta != 0]
     
-    stage0 = BackwardEliminationEstimator(SingleEliminationFeatureImportanceEstimatorCV(LinearRegression(), check_constant_model=False)) 
+    stage0 = BackwardEliminationEstimator(SingleEliminationFeatureImportanceEstimatorCV(LinearRegression())) 
     stage1 = LinearRegression()
     model = StagedEstimator([stage0, stage1])
     
@@ -356,6 +402,8 @@ def test_column_subset_transformer():
 if __name__ == '__main__':
     test_quantile_regression()
     test_single_elimination_feature_importance_estimator_cv()
+    test_univariate_feature_importance_estimator_cv()
+    test_k_best_feature_selector()
     test_backward_elimination_estimation()
     test_multiple_response_regressor()
     test_calibration()
