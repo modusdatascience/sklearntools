@@ -23,6 +23,7 @@ import warnings
 import pandas
 from model_selection import ModelSelectorCV
 from sklearn.metrics import log_loss
+from scoring import log_loss_scorer
 warnings.simplefilter("error")
 
 def sim_quantiles(taus, quantiles):
@@ -422,11 +423,9 @@ def test_model_selector_cv():
 
     model1 = ColumnSubsetTransformer(x_cols=best_subset) >> basic_model
     model2 = ColumnSubsetTransformer(x_cols=worst_subset) >> basic_model
-    def log_loss_scorer(clf, X, y, **kwargs):
-        y_pred = clf.predict(X, **kwargs)
-        return log_loss(y>0, y_pred)
+    
     model = ModelSelectorCV([model1, model2], scoring=log_loss_scorer)
-#     
+    
     model.fit(X, rate, exposure=exposure)
     np.testing.assert_array_equal(model.best_estimator_.intermediate_stages_[0].x_cols, best_subset)
 
