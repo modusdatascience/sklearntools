@@ -18,12 +18,13 @@ from feature_selection import SingleEliminationFeatureImportanceEstimatorCV,\
 from numpy.testing.utils import assert_raises
 from glm import GLM
 import statsmodels.api as sm
-from pyearth.earth import Earth
+# from pyearth.earth import Earth
 import warnings
 import pandas
 from model_selection import ModelSelectorCV
 from sklearn.metrics import log_loss
 from scoring import log_loss_scorer
+from sklearn.ensemble.forest import RandomForestRegressor
 warnings.simplefilter("error")
 
 def sim_quantiles(taus, quantiles):
@@ -322,7 +323,7 @@ def test_moving_average_smoothing_estimator():
     rate = np.random.poisson(hazard * exposure) / exposure
     
     model = CalibratedEstimatorCV(GLM(sm.families.Gaussian(sm.families.links.log), add_constant=False), 
-                                  ThresholdClassifier(HazardToRiskEstimator(MovingAverageSmoothingEstimator(Earth()))))
+                                  ThresholdClassifier(HazardToRiskEstimator(MovingAverageSmoothingEstimator(RandomForestRegressor()))))
     
     model.fit(X, rate, exposure=exposure)
     

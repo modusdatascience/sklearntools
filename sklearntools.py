@@ -11,7 +11,10 @@ from functools import update_wrapper
 from inspect import getargspec
 
 def safe_call(fn, args):
-    spec = getargspec(fn)
+    if hasattr(fn, '_spec'):
+        spec = fn._spec
+    else:   
+        spec = getargspec(fn)
     if spec.keywords is not None:
         return fn(**args)
     else:
@@ -272,13 +275,20 @@ class _BasicDelegateDescriptor(object):
         if not hasattr(obj, clone_name):
             delegate = getattr(obj, delegate_name)
             method = getattr(delegate, self.method_name)
+            spec = getargspec(method)
             def out(*args, **kwargs):
                 setattr(obj, clone_name, method(*args, **kwargs))
                 return obj
+            out._spec = spec
         else:
             delegate = getattr(obj, clone_name)
             method = getattr(delegate, self.method_name)
-            out = lambda *args, **kwargs: method(*args, **kwargs)
+            spec = getargspec(method)
+            def out(*args, **kwargs):
+                return method(*args, **kwargs)
+            out._spec = spec
+#             out = lambda *args, **kwargs: method(*args, **kwargs)
+#             out = method
         update_wrapper(out, self.fn)
         return out
 
@@ -381,14 +391,27 @@ class TransformerStage(EstimatorStage):
 # class ConcatenatingResponseStage(EstimatorStage):
 #     def update(self, data):
 #         data[''] = self.transform(**data)
+class Wrapper(object):
+    def __init__(self, content):
+        self.content = content
+
 class AlreadyFittedEstimator(DelegatingEstimator):
     def __init__(self, estimator):
-        self.estimator = estimator
-        self.estimator_ = self.estimator
+        if isinstance(estimator, Wrapper):
+            self.estimator = estimator
+        else:
+            self.estimator = Wrapper(estimator)
+#         self.estimator_ = self.estimator.content
         self._create_delegates('estimator', non_fit_methods)
+    
+    @property
+    def estimator_(self):
+        return self.estimator.content
     
     def fit(self, X, y=None, sample_weight=None, exposure=None):
         return self
+    
+#     def predict(self):
 #     
 # def mask_estimator(estimator, mask):
 #     return MaskedEstimator(estimator, mask)

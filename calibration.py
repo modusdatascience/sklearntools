@@ -105,8 +105,14 @@ class MovingAverageSmoothingEstimator(DelegatingEstimator):
         self._create_delegates('estimator', non_fit_methods)
         
     def fit(self, X, y):
+#         if sample_weight is not None:
+#             raise ValueError('sample_weight not supported')
+#         if exposure is not None:
+#             raise ValueError('exposure not supported')
         if len(y.shape) == 1:
             y = y[:, None]
+        if len(X.shape) == 1:
+            X = X[:, None]
             
         # Sort on X
         order = np.argsort(X, axis=0, kind=self.sort_algorithm, order=self.sort_order)[:,0]
@@ -116,9 +122,35 @@ class MovingAverageSmoothingEstimator(DelegatingEstimator):
         y_ = moving_average(y[order, :], self.window_size)
         
         # Fit estimator on the moving averages
+        if y_.shape[1] == 1:
+            y_ = np.ravel(y_)
         self.estimator_ = clone(self.estimator).fit(X_, y_)
         
         return self
+
+class ConstantRateToTotalEstimator(STSimpleEstimator, MetaEstimatorMixin):
+    '''
+    When fit, expects to receive predicted rate of accumulation (of, say, cost) as 
+    X and observed totals (say, total cost during exposure) as y.  Also expects
+    to receive exposure.  Once fit, predicts total (based on exposure).
+    
+    Basically, all this does is multiply rate by exposure.  Recommend piping in a 
+    PredictorTransformer.
+    '''
+    def __init__(self):
+        pass
+    
+    def fit(self, X, y, sample_weight=None, exposure=None):
+        pass
+    
+    def predict(self, X, exposure):
+        if exposure is None:
+            raise ValueError('Must provide exposure')
+        return exposure * X
+    
+    def transform(self, X, exposure):
+        return self.predict(X, exposure)
+    
 
 class HazardToRiskEstimator(STSimpleEstimator, MetaEstimatorMixin):
     '''
@@ -344,11 +376,14 @@ class ProbaPredictingEstimator(DelegatingEstimator):
         return self.estimator_.predict_proba(X, *args, **kwargs)[:, :-1]
     
 class ResponseTransformingEstimator(DelegatingEstimator):
-    def __init__(self, estimator, transformer, est_weight=False, trans_weight=False):
+    def __init__(self, estimator, transformer, est_weight=False, est_exposure=False, trans_weight=False,
+                 trans_exposure=False):
         self.estimator = estimator
         self.transformer = transformer
         self.est_weight = est_weight
+        self.est_exposure = est_exposure
         self.trans_weight = trans_weight
+        self.trans_exposure = trans_exposure
         self._create_delegates('estimator', ['predict', 'transform', 'predict_proba', 
                                              'predict_log_proba', 'decision_function'])
     
@@ -356,25 +391,29 @@ class ResponseTransformingEstimator(DelegatingEstimator):
     def _estimator_type(self):
         return self.estimator._estimator_type
     
-    def fit(self, X, y, sample_weight=None, transformer_args={}, estimator_args={}):
+    def fit(self, X, y, sample_weight=None, exposure=None):
         transformer_args_ = {'X': y}
-        transformer_args_.update(transformer_args)
         if self.trans_weight:
             transformer_args_['sample_weight'] = sample_weight
+        if self.trans_exposure:
+            transformer_args_['exposure'] = exposure
         self.transformer_ = clone(self.transformer).fit(**transformer_args_)
         y_transformed = self.transformer_.transform(y)
         estimator_args_ = {'X': X, 'y': y_transformed}
-        estimator_args_.update(estimator_args)
         if self.est_weight:
             estimator_args_['sample_weight'] = sample_weight
+        if self.est_exposure:
+            estimator_args_['exposure'] = exposure
         self.estimator_ = clone(self.estimator).fit(**estimator_args_)
         return self
     
-    def score(self, X, y, sample_weight=None):
+    def score(self, X, y, sample_weight=None, exposure=None):
         y_transformed = self.transformer_.transform(y)
         args = {'X': X, 'y': y_transformed}
         if self.est_weight:
             args['sample_weight'] = sample_weight
+        if self.est_exposure:
+            args['exposure'] = exposure
         return self.estimator_.score(**args)
 #     
 #     def predict(self, X):
