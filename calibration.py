@@ -109,6 +109,8 @@ class MovingAverageSmoothingEstimator(DelegatingEstimator):
 #             raise ValueError('sample_weight not supported')
 #         if exposure is not None:
 #             raise ValueError('exposure not supported')
+        y = np.asarray(y)
+        X = np.asarray(X)
         if len(y.shape) == 1:
             y = y[:, None]
         if len(X.shape) == 1:
@@ -119,8 +121,10 @@ class MovingAverageSmoothingEstimator(DelegatingEstimator):
         
         # Moving average on X and y based on sort order of X
         X_ = moving_average(X[order, :], self.window_size)
-        y_ = moving_average(y[order, :], self.window_size)
-        
+        try:
+            y_ = moving_average(y[order, :], self.window_size)
+        except:
+            y_ = moving_average(y[order, :], self.window_size)
         # Fit estimator on the moving averages
         if y_.shape[1] == 1:
             y_ = np.ravel(y_)
@@ -141,11 +145,13 @@ class ConstantRateToTotalEstimator(STSimpleEstimator, MetaEstimatorMixin):
         pass
     
     def fit(self, X, y, sample_weight=None, exposure=None):
-        pass
+        return self
     
     def predict(self, X, exposure):
         if exposure is None:
             raise ValueError('Must provide exposure')
+        if len(X.shape) == 1:
+            X = X[:, None]
         return exposure * X
     
     def transform(self, X, exposure):
@@ -174,6 +180,7 @@ class HazardToRiskEstimator(STSimpleEstimator, MetaEstimatorMixin):
         return np.exp(-X * exposure)
     
     def fit(self, X, y, sample_weight=None, exposure=None):
+        y = np.asarray(y)
         fit_args = {'X': self._preprocess_x(X, exposure),
                     'y': y[:,0] if len(y.shape) == 2 and y.shape[1] == 1 else y}
         if sample_weight is not None:
@@ -206,7 +213,10 @@ class PredictorTransformer(DelegatingEstimator):
         args = {'X': X}
         if exposure is not None:
             args['exposure'] = exposure
-        return self.predict(**args)
+        result = self.predict(**args)
+        if len(result.shape) == 1:
+            result = result[:, None]
+        return result
 
 def no_cv(X, y):
     yield np.ones(X.shape[0]).astype(bool), np.ones(X.shape[0]).astype(bool)

@@ -19,8 +19,12 @@ def safe_call(fn, args):
         return fn(**args)
     else:
         safe_args = {arg: args[arg] for arg in spec.args[1:] if arg in args}
-        return fn(**safe_args)
-
+        try:
+            return fn(**safe_args)
+        except:
+            1+1
+            return fn(**safe_args)
+        
 def safer_call(fn, *args, **kwargs):
     kwargs = kwargs.copy()
     try:
@@ -164,6 +168,8 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
             except AttributeError:
                 data['X'] = safe_call(stage_.transform, self._transform_args(data))
             self.intermediate_stages_.append(stage_)
+#             if 'X' in data and len(data['X'].shape) == 1:
+#                 data['X'] = data['X'][:, None]
         self.final_stage_ = safe_call(clone(self.final_stage).fit, data)
         return self
     
@@ -176,7 +182,7 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
         data = self._process_args(X=X, exposure=exposure)
         self._update(data)
         return safe_call(self.final_stage_.predict, data)
-    
+        
     def predict_proba(self, X, exposure=None):
         data = self._process_args(X=X, exposure=exposure)
         self._update(data)
@@ -411,6 +417,36 @@ class AlreadyFittedEstimator(DelegatingEstimator):
     def fit(self, X, y=None, sample_weight=None, exposure=None):
         return self
     
+class BoundedEstimator(DelegatingEstimator):
+    def __init__(self, estimator, lower_bound=float('-inf'), upper_bound=float('inf')):
+        self.estimator = estimator
+        self.lower_bound = lower_bound
+        self.upper_bound = upper_bound
+        # Delegate everything except predict and score
+        self._create_delegates('estimator', ['fit', 'predict_proba', 'decision_function', 
+                         'predict_log_proba', 'transform'])
+    
+    @if_delegate_has_method('estimator')
+    def predict(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        raw_prediction = self.estimator_.predict(**data)
+        bounded_prediction = np.maximum(np.minimum(raw_prediction, self.upper_bound), self.lower_bound)
+        return bounded_prediction
+        
+    @if_delegate_has_method('estimator')
+    def predict_proba(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        return self.estimator_.predict_proba(**data)
+    
+    @if_delegate_has_method('estimator')
+    def predict_log_proba(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        return self.estimator_.predict_log_proba(**data)
+    
+    @if_delegate_has_method('estimator')
+    def decision_function(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        return self.estimator_.decision_function(**data)
 #     def predict(self):
 #     
 # def mask_estimator(estimator, mask):

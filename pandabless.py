@@ -19,58 +19,66 @@ class InputFixingTransformer(STSimpleEstimator, Pandable):
     def fit(self, X, y, sample_weights=None, exposure=None):
         if self.predictors is None:
             self.predictors_ = list(X.columns)
-        else:
-            self.predictors_ = self.predictors
+#         else:
+#             self.predictors_ = [self.predictors]
         if self.responses is None:
             self.responses_ = list(y.columns)
-        else:
-            self.responses_ = self.responses
+#         else:
+#             self.responses_ = self.responses
         if self.sample_weights is None and sample_weights is not None:
             self.sample_weights_ = list(sample_weights.columns)
-        else:
-            self.sample_weights_ = self.sample_weights
+#         else:
+#             self.sample_weights_ = self.sample_weights
         if self.exposure is None and exposure is not None:
             self.exposure_ = list(exposure.columns)
-        else:
-            self.exposure_ = self.exposure
+#         else:
+#             self.exposure_ = self.exposure
     
         return self
     
     def _y_index(self):
-        if self.responses_ is None:
+        if hasattr(self, 'responses_') and self.responses_ is None:
             if self.responses is None:
                 return None
             else:
                 return self.responses
-        else:
+        elif hasattr(self, 'responses_'):
             return self.responses_
+        else:
+            return None
         
     def _x_index(self):
-        if self.predictors_ is None:
+        if hasattr(self, 'predictors_') and self.predictors_ is None:
             if self.predictors is None:
                 return None
             else:
                 return self.predictors
-        else:
+        elif hasattr(self, 'predictors_'):
             return self.predictors_
+        else:
+            return None
     
     def _weight_index(self):
-        if self.sample_weights_ is None:
+        if hasattr(self, 'sample_weights_') and self.sample_weights_ is None:
             if self.sample_weights is None:
                 return None
             else:
                 return self.sample_weights
-        else:
+        elif hasattr(self, 'sample_weights_'):
             return self.sample_weights_
+        else:
+            return None
     
     def _exposure_index(self):
-        if self.exposure_ is None:
+        if hasattr(self, 'exposure_') and self.exposure_ is None:
             if self.exposure is None:
                 return None
             else:
                 return self.exposure
-        else:
+        elif hasattr(self, 'exposure_'):
             return self.exposure_
+        else:
+            return None
     
     def transform(self, X, exposure=None):
         x_index = self._x_index()
