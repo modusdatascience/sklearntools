@@ -1,4 +1,4 @@
-from sklearntools import STSimpleEstimator
+from .sklearntools import STSimpleEstimator
 
 
 class Pandable(object):

@@ -4,26 +4,26 @@ Created on Feb 23, 2016
 @author: jason
 '''
 import numpy as np
-from sklearntools import StagedEstimator, MaskedEstimator,\
+from .sklearntools import StagedEstimator, MaskedEstimator,\
     ColumnSubsetTransformer, NonNullSubsetFitter
 from sklearn.linear_model.base import LinearRegression
 from sklearn.linear_model.logistic import LogisticRegression
-from calibration import CalibratedEstimatorCV, ResponseTransformingEstimator,\
+from .calibration import CalibratedEstimatorCV, ResponseTransformingEstimator,\
     LogTransformer, PredictorTransformer, HazardToRiskEstimator,\
     MovingAverageSmoothingEstimator, ThresholdClassifier, ProbaPredictingEstimator
 
-from feature_selection import SingleEliminationFeatureImportanceEstimatorCV,\
+from .feature_selection import SingleEliminationFeatureImportanceEstimatorCV,\
     BackwardEliminationEstimator, UnivariateFeatureImportanceEstimatorCV,\
     BestKFeatureSelector
 from numpy.testing.utils import assert_raises
-from glm import GLM
+from .glm import GLM
 import statsmodels.api as sm
 # from pyearth.earth import Earth
 import warnings
 import pandas
-from model_selection import ModelSelectorCV
+from .model_selection import ModelSelectorCV
 from sklearn.metrics import log_loss
-from scoring import log_loss_scorer
+from .scoring import log_loss_scorer
 from sklearn.ensemble.forest import RandomForestRegressor
 warnings.simplefilter("error")
 

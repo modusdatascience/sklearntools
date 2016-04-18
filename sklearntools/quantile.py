@@ -1,7 +1,7 @@
 from cvxpy import Variable, Minimize, Problem
 from cvxpy.settings import OPTIMAL
 import numpy as np
-from sklearntools import STSimpleEstimator
+from .sklearntools import STSimpleEstimator
 
 class QuantileRegressor(STSimpleEstimator):
     _estimator_type = 'regressor'

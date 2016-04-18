@@ -1,4 +1,4 @@
-from sklearntools import STSimpleEstimator, BaseDelegatingEstimator,\
+from .sklearntools import STSimpleEstimator, BaseDelegatingEstimator,\
     _fit_and_score, standard_methods, non_fit_methods
 from sklearn.base import MetaEstimatorMixin, is_classifier, clone
 from itertools import product
@@ -6,8 +6,8 @@ from sklearn.cross_validation import check_cv
 from sklearn.externals.joblib.parallel import Parallel, delayed
 import numpy as np
 from sklearn.metrics.scorer import check_scoring
-from feature_selection import check_score_combiner
-from calibration import no_cv
+from .feature_selection import check_score_combiner
+from .calibration import no_cv
 
 def candidate_grid(estimator, param_grid):
     pass

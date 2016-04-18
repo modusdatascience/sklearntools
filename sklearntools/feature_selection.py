@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.base import MetaEstimatorMixin, is_classifier, clone,\
     TransformerMixin
-from sklearntools import STSimpleEstimator, _fit_and_score, DelegatingEstimator,\
+from .sklearntools import STSimpleEstimator, _fit_and_score, DelegatingEstimator,\
     BaseDelegatingEstimator, standard_methods
 from sklearn.cross_validation import check_cv
 from sklearn.metrics.scorer import check_scoring

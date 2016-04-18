@@ -4,7 +4,7 @@ Created on Feb 15, 2016
 @author: jason
 '''
 
-from sklearntools import MultipleResponseEstimator, BackwardEliminationEstimatorCV, \
+from .sklearntools import MultipleResponseEstimator, BackwardEliminationEstimatorCV, \
     QuantileRegressor, ResponseTransformingEstimator
 from pyearth import Earth
 from sklearn.pipeline import Pipeline
