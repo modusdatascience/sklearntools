@@ -166,7 +166,10 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
             try:
                 stage_.update(data)
             except AttributeError:
-                data['X'] = safe_call(stage_.transform, self._transform_args(data))
+                try:
+                    data['X'] = safe_call(stage_.transform, self._transform_args(data))
+                except:
+                    data['X'] = safe_call(stage_.transform, self._transform_args(data))
             self.intermediate_stages_.append(stage_)
 #             if 'X' in data and len(data['X'].shape) == 1:
 #                 data['X'] = data['X'][:, None]
@@ -377,7 +380,7 @@ class BaseDelegatingEstimator(with_metaclass(DelegatingMetaClass, STSimpleEstima
 class DelegatingEstimator(BaseDelegatingEstimator):
     _delegates = {'fit': 'estimator', 'predict': 'estimator', 'score': 'estimator', 
                   'predict_proba': 'estimator', 'decision_function': 'estimator', 
-                  'predict_log_proba': 'estimator'}
+                  'predict_log_proba': 'estimator', 'transform': 'estimator'}
     def __init__(self, estimator):
         self.estimator = estimator
 

@@ -5,17 +5,20 @@ from sklearntools import STSimpleEstimator
 
 class QuantileRegressor(STSimpleEstimator):
     _estimator_type = 'regressor'
-    def __init__(self, q, prevent_crossing=True, lower_bound=None, upper_bound=None):
+    def __init__(self, q, prevent_crossing=True, lower_bound=None, upper_bound=None, solver_options=None):
         self.q = np.asarray(q)
         self.prevent_crossing = prevent_crossing
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
+        self.solver_options = solver_options
     
     def fit(self, X, y, sample_weight=None):
         if sample_weight is None:
             w = np.ones_like(y)
         else:
             w = sample_weight
+        X = np.asarray(X)
+        y = np.asarray(y)
         m, n = X.shape
         p = len(self.q)
 #         variables = []
@@ -49,7 +52,11 @@ class QuantileRegressor(STSimpleEstimator):
             last_t = t
         objective = Minimize(objective_function)
         problem = Problem(objective, constraints)
-        problem.solve()
+        if self.solver_options is None:
+            solver_options = {}
+        else:
+            solver_options = self.solver_options
+        problem.solve(**solver_options)
         if problem.status != OPTIMAL:
             raise ValueError('Problem status is: %s' % problem.status)
         self.coef_ = np.array([np.ravel(b.value) for b in b_vars]).T

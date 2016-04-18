@@ -1,5 +1,5 @@
 from sklearntools import STSimpleEstimator, DelegatingEstimator, non_fit_methods,\
-    standard_methods, _subset
+    standard_methods, _subset, safe_col_select, safe_call
 from sklearn.base import MetaEstimatorMixin, is_classifier, clone,\
     TransformerMixin
 from sklearn.cross_validation import check_cv
@@ -40,35 +40,35 @@ class ThresholdClassifier(STSimpleEstimator, MetaEstimatorMixin):
             clas_args['sample_weight'] = sample_weight
         if exposure is not None:
             clas_args['exposure'] = exposure
-        self.classifier_ = clone(self.classifier).fit(**clas_args)
+        self.classifier_ = safe_call(clone(self.classifier).fit, clas_args)
         return self
     
     def predict(self, X, exposure=None):
         clas_args = {'X': X}
         if exposure is not None:
             clas_args['exposure'] = exposure
-        return self.classifier_.predict(**clas_args)
+        return safe_call(self.classifier_.predict, clas_args)
     
     @if_delegate_has_method(delegate='classifier')
     def decision_function(self, X, exposure=None):
         clas_args = {'X': X}
         if exposure is not None:
             clas_args['exposure'] = exposure
-        return self.classifier_.decision_function(**clas_args)
+        return safe_call(self.classifier_.decision_function, clas_args)
     
     @if_delegate_has_method(delegate='classifier')
     def predict_proba(self, X, exposure=None):
         clas_args = {'X': X}
         if exposure is not None:
             clas_args['exposure'] = exposure
-        return self.classifier_.predict_proba(**clas_args)
+        return safe_call(self.classifier_.predict_proba, clas_args)
     
     @if_delegate_has_method(delegate='classifier')
     def predict_log_proba(self, X, exposure=None):
         clas_args = {'X': X}
         if exposure is not None:
             clas_args['exposure'] = exposure
-        return self.classifier_.predict_log_proba(**clas_args)
+        return safe_call(self.classifier_.predict_log_proba, clas_args)
 
 # class SeparateSortingEstimator(STSimpleEstimator, MetaEstimatorMixin):
 #     '''
@@ -177,7 +177,7 @@ class HazardToRiskEstimator(STSimpleEstimator, MetaEstimatorMixin):
             X = X[:, None]
         if len(exposure.shape) == 1:
             exposure = exposure[:, None]
-        return np.exp(-X * exposure)
+        return 1. - np.exp(-X * exposure)
     
     def fit(self, X, y, sample_weight=None, exposure=None):
         y = np.asarray(y)
@@ -218,6 +218,19 @@ class PredictorTransformer(DelegatingEstimator):
             result = result[:, None]
         return result
 
+class SelectorTransformer(STSimpleEstimator):
+    '''
+    Just grab some input columns and pass them through.
+    '''
+    def __init__(self, columns):
+        self.columns = columns
+
+    def fit(self, X, y=None, sample_weight=None, exposure=None):
+        return self
+    
+    def transform(self, X, exposure=None):
+        return safe_col_select(X, self.columns)
+    
 def no_cv(X, y):
     yield np.ones(X.shape[0]).astype(bool), np.ones(X.shape[0]).astype(bool)
 
@@ -383,7 +396,7 @@ class ProbaPredictingEstimator(DelegatingEstimator):
         return self
     
     def predict(self, X, *args, **kwargs):
-        return self.estimator_.predict_proba(X, *args, **kwargs)[:, :-1]
+        return self.estimator_.predict_proba(X, *args, **kwargs)[:, 1:]
     
 class ResponseTransformingEstimator(DelegatingEstimator):
     def __init__(self, estimator, transformer, est_weight=False, est_exposure=False, trans_weight=False,

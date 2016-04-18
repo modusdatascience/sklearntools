@@ -1,6 +1,22 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from sklearn.utils import resample
+from sklearn.metrics.ranking import roc_curve, auc
+
+def plot_roc(observed, predicted, name, iterations=100, **kwargs):
+    fpr, tpr, thresholds = roc_curve(observed, predicted)
+    roc_auc = auc(fpr, tpr)
+    bsauc = []
+    for _ in range(iterations):
+        obs, pred = resample(observed, predicted)
+        fpr_, tpr_, thresholds = roc_curve(obs, pred)
+        bsauc.append(auc(fpr_, tpr_))
+    bsauc = np.asarray(bsauc)
+    lower = np.percentile(bsauc, 2.5)
+    upper = np.percentile(bsauc, 97.5)
+    plt.plot(fpr, tpr, label='Model %s (AUC = %0.3f, 95%% CI %0.3f-%0.3f)' % (name, roc_auc, lower, upper), **kwargs)
+    plt.plot([0, 1], [0, 1], 'k--')
+    plt.legend(loc=0)
 
 class MovingWindowStatistic(object):
     def __init__(self, window_size, stat):
@@ -47,6 +63,30 @@ class BinStatistic(object):
 #             result.append(self.stat(data))
         return np.array(result)
 
+class CategoryStatistic(object):
+    def __init__(self, stat):
+        self.stat = stat
+        
+    def __call__(self, x, category_table):
+        result = []
+        for col in category_table:
+            cat_dat = np.asarray(x)[np.asarray(category_table[col])]
+            if len(cat_dat) > 0:
+                result.append(self.stat(cat_dat))
+            else:
+                result.append(float('nan'))
+        return np.asarray(result)
+
+# class CategoryStatistic(object):
+#     def __init__(self, stat):
+#         self.stat = stat
+#         
+#     def __call__(self, x, category_index, categories):
+#         result = []
+#         for category in categories:
+#             result.append(self.stat(x[category_index == category]))
+#         return np.array(result)
+
 def percentile(p):
     return lambda x: np.nanpercentile(x, p)
 
@@ -64,7 +104,7 @@ def bootstrap(outer_stat, inner_stat, n):
     def _bootstrap(x):
         result = np.zeros(shape=n)
         for i in range(n):
-            result[i] = inner_stat(resample(x))
+            result[i] = inner_stat(resample(np.asarray(x)))
         return outer_stat(result)
     return _bootstrap
 
@@ -81,7 +121,7 @@ def statistic_error_bar_plot(StatClass):
         x_plot = xstat(x, order)
         y_center = centerstat(y, order)
         y_lower = y_center - lowerstat(y, order)
-        y_upper = upperstat(y, order)  - y_center
+        y_upper = upperstat(y, order) - y_center
         
         y_err = np.concatenate([y_lower[:, None], y_upper[:, None]], axis=1)
         if center_kwargs is None:
@@ -93,6 +133,47 @@ def statistic_error_bar_plot(StatClass):
 
 moving_window_error_bar_plot = statistic_error_bar_plot(MovingWindowStatistic)
 bin_error_bar_plot = statistic_error_bar_plot(BinStatistic)
+
+def category_error_bar_plot(category_table, y, center_statistic, lower_statistic, upper_statistic, center_kwargs,
+                            *args, **kwargs):
+    centerstat = CategoryStatistic(center_statistic)
+    lowerstat = CategoryStatistic(lower_statistic)
+    upperstat = CategoryStatistic(upper_statistic)
+    
+    category_names = list(category_table.columns)
+    x_plot = np.arange(len(category_names))
+    y_center = centerstat(y, category_table)
+    y_lower = y_center - lowerstat(y, category_table)
+    y_upper = upperstat(y, category_table) - y_center
+
+    y_err = np.concatenate([y_lower[:, None], y_upper[:, None]], axis=1)
+    
+    if center_kwargs is None:
+        center_kwargs = {}
+    plt.plot(x_plot, y_center, **center_kwargs)
+    
+    plt.errorbar(x_plot, y_center, yerr=y_err.T, *args, **kwargs)
+#     plt.xticks(x_plot, category_names)
+
+
+# def category_error_bar_plot(category_array, category_names, y, center_statistic, lower_statistic, upper_statistic, 
+#                         center_kwargs, *args, **kwargs):
+#     centerstat = CategoryStatistic(center_statistic)
+#     lowerstat = CategoryStatistic(lower_statistic)
+#     upperstat = CategoryStatistic(upper_statistic)
+#     
+#     x_plot = np.arange(len(category_names))
+#     y_center = centerstat(y, category_array, category_names)
+#     y_lower = y_center - lowerstat(y, category_array, category_names)
+#     y_upper = upperstat(y, category_array, category_names) - y_center
+#     
+#     y_err = np.concatenate([y_lower[:, None], y_upper[:, None]], axis=1)
+#     
+#     if center_kwargs is None:
+#         center_kwargs = {}
+#     plt.plot(x_plot, y_center, **center_kwargs)
+#     plt.errorbar(x_plot, y_center, yerr=y_err.T, *args, **kwargs)
+#     plt.xlabel(category_names)
 
 def statistic_plot(StatClass):
     def _statistic_plot(x, y, n, x_statistic, y_statistic, *args, **kwargs):
@@ -109,21 +190,54 @@ def statistic_plot(StatClass):
 
 moving_window_plot = statistic_plot(MovingWindowStatistic)
 bin_plot = statistic_plot(BinStatistic)
+def category_plot(category_table, y, statistic, *args, **kwargs):
+    cols = list(category_table.columns)
+    x_plot = np.arange(len(cols))
+    y_plot = CategoryStatistic(statistic)(y, category_table)
+    plt.plot(x_plot, y_plot, *args, **kwargs)
+    plt.xticks(x_plot, cols)
+    _, labels = plt.xticks()
+    plt.setp(labels, rotation=90)
+    plt.xlim(x_plot[0] - .05 * x_plot[-1], x_plot[-1] + .05 * x_plot[-1])
     
+# def category_plot(category_array, category_names, y, statistic, *args, **kwargs):
+#     stat = CategoryStatistic(statistic)
+#     
+#     x_plot = np.arange(len(category_names))
+#     y_plot = stat(y, category_array, category_names)
+#     
+#     plt.plot(x_plot, y_plot, *args, **kwargs)
+#     plt.xlabel(category_names)
+#     
 
 
-def calibration_bin_plot(covariate, observed, predicted, n_bins=20, n_bootstraps=100, observed_label='Observed', 
-                         predicted_label='Predicted', title=None):
+def calibration_category_plot(category_table, observed, predicted,  obs_stat=mean, pred_stat=mean, pred_function=lambda obs, pred: pred, 
+                              percent=95, n_bootstraps=100, observed_label='Observed', predicted_label='Predicted', title=None):
     error_bar_kwargs = {'marker':'.', 'linestyle':''}
     if observed_label is not None:
         error_bar_kwargs['label'] = observed_label
-    bin_error_bar_plot(covariate, observed, n_bins, quantile(.5), mean, bootstrap(quantile(.025), mean, n_bootstraps), 
-                       bootstrap(quantile(.975), mean, n_bootstraps), error_bar_kwargs, linestyle='')
+     
+    category_error_bar_plot(category_table, pred_function(observed, predicted), obs_stat, bootstrap(quantile(.5 - percent / 200.), obs_stat, n_bootstraps), 
+                            bootstrap(quantile(.5 + percent / 200.), obs_stat, n_bootstraps), error_bar_kwargs, linestyle='')
+     
+    if predicted_label is not None:
+        category_plot(category_table, pred_function(observed, predicted), pred_stat, '.', label=predicted_label)
+    plt.legend(loc='best')
+    if title is not None:
+        plt.title(title)
+
+def calibration_bin_plot(covariate, observed, predicted, obs_stat=mean, pred_stat=mean, pred_function=lambda obs, pred: pred, 
+                         percent=95, n_bins=20, n_bootstraps=100, observed_label='Observed', predicted_label='Predicted', title=None):
+    error_bar_kwargs = {'marker':'.', 'linestyle':''}
+    if observed_label is not None:
+        error_bar_kwargs['label'] = observed_label
+    bin_error_bar_plot(covariate, pred_function(observed, predicted), n_bins, quantile(.5), obs_stat, bootstrap(quantile(.5 - percent / 200.), obs_stat, n_bootstraps), 
+                       bootstrap(quantile(.5 + percent / 200.), obs_stat, n_bootstraps), error_bar_kwargs, linestyle='')
 #     bin_plot(y_pred, y, n_bins, quantile(.5), mean, '.', label='Mean Observation')
 #     bin_plot(y_pred, y, n_bins, quantile(.5), mean_pm_std(1.), '.', label='Mean Observation + STD')
 #     bin_plot(y_pred, y, n_bins, quantile(.5), mean_pm_std(-1.), '.', label='Mean Observation - STD')
     if predicted_label is not None:
-        bin_plot(covariate, predicted, n_bins, quantile(.5), mean, '.', label=predicted_label)
+        bin_plot(covariate, pred_function(observed, predicted), n_bins, quantile(.5), pred_stat, '.', label=predicted_label)
     plt.legend(loc='best')
     if title is not None:
         plt.title(title)
