@@ -3,9 +3,9 @@ import statsmodels.api
 import statsmodels.genmod.families.family
 import numpy as np
 from sklearn.metrics import r2_score
-from sklearn.base import BaseEstimator
+from .sklearntools import STSimpleEstimator
 
-class GLM(BaseEstimator):
+class GLM(STSimpleEstimator):
     '''
     A scikit-learn style wrapper for statsmodels.api.GLM.  The purpose of this class is to 
     make generalized linear models compatible with scikit-learn's Pipeline objects.
