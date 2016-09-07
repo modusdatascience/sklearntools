@@ -3,7 +3,7 @@ import statsmodels.api
 import statsmodels.genmod.families.family
 import numpy as np
 from sklearn.metrics import r2_score
-from .sklearntools import STSimpleEstimator
+from sklearntools import STSimpleEstimator
 
 class GLM(STSimpleEstimator):
     '''

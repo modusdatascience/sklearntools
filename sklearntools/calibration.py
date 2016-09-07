@@ -1,4 +1,4 @@
-from .sklearntools import STSimpleEstimator, DelegatingEstimator, non_fit_methods,\
+from sklearntools import STSimpleEstimator, DelegatingEstimator, non_fit_methods,\
     standard_methods, _subset, safe_col_select, safe_call
 from sklearn.base import MetaEstimatorMixin, is_classifier, clone,\
     TransformerMixin

@@ -9,6 +9,7 @@ from sklearn.utils.metaestimators import if_delegate_has_method
 from six import with_metaclass
 from functools import update_wrapper
 from inspect import getargspec
+from _collections import defaultdict
 
 def safe_call(fn, args):
     if hasattr(fn, '_spec'):
@@ -523,7 +524,50 @@ class BaseRowSubsetFitter(DelegatingEstimator):
                                   exposure=exposure)
         self.estimator_ = clone(self.estimator).fit(**(_subset_data(data, self._predicate(data))))
         return self
+
+class ArgumentFixingEstimator(STSimpleEstimator, MetaEstimatorMixin):
+    def __init__(self, estimator, arg_dict):
+        self.estimator = estimator
+        self.arg_dict = arg_dict
+#         self._create_delegates('estimator', non_fit_methods)
     
+    @if_delegate_has_method('estimator')
+    def fit(self, X, y=None, sample_weight=None, exposure=None):
+        data = self._process_args(X=X, y=y, sample_weight=sample_weight,
+                                  exposure=exposure)
+        if 'fit' in self.arg_dict:
+            data.update(self.arg_dict['fit'])
+        self.estimator_ = clone(self.estimator).fit(**data)
+        return self
+    
+    @if_delegate_has_method('estimator')
+    def predict(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        if 'predict' in self.arg_dict:
+            data.update(self.arg_dict['predict'])
+        return self.estimator_.predict(**data)
+    
+    @if_delegate_has_method('estimator')
+    def predict_proba(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        if 'predict_proba' in self.arg_dict:
+            data.update(self.arg_dict['predict_proba'])
+        return self.estimator_.predict_proba(**data)
+    
+    @if_delegate_has_method('estimator')
+    def predict_log_proba(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        if 'predict_log_proba' in self.arg_dict:
+            data.update(self.arg_dict['predict_log_proba'])
+        return self.estimator_.predict_log_proba(**data)
+    
+    @if_delegate_has_method('estimator')
+    def decision_function(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        if 'decision_function' in self.arg_dict:
+            data.update(self.arg_dict['decision_function'])
+        return self.estimator_.decision_function(**data)
+
 def non_null_rows(arr):
     if hasattr(arr, 'notnull'):
         return arr.notnull().any(axis=1)
