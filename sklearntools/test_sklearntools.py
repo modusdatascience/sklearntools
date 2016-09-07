@@ -22,13 +22,9 @@ import statsmodels.api as sm
 import warnings
 import pandas
 from model_selection import ModelSelectorCV
-from sklearn.metrics import log_loss
 from scoring import log_loss_scorer
 from sklearn.ensemble.forest import RandomForestRegressor
-from pyearth.earth import Earth
-from sklearn.ensemble.weight_boosting import AdaBoostClassifier
-from sklearn.svm.classes import SVC
-# warnings.simplefilter("error")
+warnings.simplefilter("error")
     
 def test_single_elimination_feature_importance_estimator_cv():
     np.random.seed(0)
