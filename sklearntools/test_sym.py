@@ -5,7 +5,7 @@ from calibration import ProbaPredictingEstimator,\
     ThresholdClassifier
 from sym import STNumpyPrinter, STJavaScriptPrinter
 import pandas
-from sym import javascript_str, syms
+from sym import javascript_str, numpy_str, python_str
 
 def test_sympy_export():
     np.random.seed(1)
@@ -30,7 +30,8 @@ def test_sympy_export():
     jsprinter = STJavaScriptPrinter()
     print jsprinter.doprint(expression)
     print javascript_str('test_model', model)
-    
+    print numpy_str('test_model', model)
+    print python_str('test_model', model)
     
 if __name__ == '__main__':
     test_sympy_export()

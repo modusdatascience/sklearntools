@@ -11,6 +11,7 @@ from sympy.printing.jscode import JavascriptCodePrinter
 import os
 from resources import resources
 from mako.template import Template
+from sympy.printing.python import PythonPrinter
 
 def call_method_or_dispatch(method_name, dispatcher):
     def _call_method_or_dispatch(estimator, *args, **kwargs):
@@ -87,17 +88,6 @@ def fallback(*args):
 sym_update_dispatcher = {}
 sym_update = fallback(call_method_or_dispatch('sym_update', sym_update_dispatcher), sym_transform)
 
-class STNumpyPrinter(NumPyPrinter):
-    def _print_Max(self, expr):
-        return 'maximum(' + ','.join(self._print(i) for i in expr.args) + ')'
-
-    def _print_NaNProtect(self, expr):
-        return 'where(isnan(' + ','.join(self._print(a) for a in expr.args) + '), 0, ' \
-            + ','.join(self._print(a) for a in expr.args) + ')'
-
-    def _print_Missing(self, expr):
-        return 'isnan(' + ','.join(self._print(a) for a in expr.args) + ').astype(float)'
-
 class STJavaScriptPrinter(JavascriptCodePrinter):
     def _print_Max(self, expr):
         return 'Math.max(' + ','.join(self._print(i) for i in expr.args) + ')'
@@ -108,7 +98,7 @@ class STJavaScriptPrinter(JavascriptCodePrinter):
     def _print_Missing(self, expr):
         return 'missing(' + ','.join(self._print(a) for a in expr.args) + ')'
     
-javascript_template_filename = os.path.join(resources, 'template.mako.js')
+javascript_template_filename = os.path.join(resources, 'javascript_template.mako.js')
 with open(javascript_template_filename) as infile:
     javascript_template = Template(infile.read())
 
@@ -117,4 +107,52 @@ def javascript_str(function_name, estimator, method=sym_predict):
     expression = method(estimator)
     return javascript_template.render(function_name=function_name, input_names=input_names,
                                       function_code=STJavaScriptPrinter().doprint(expression))
+
+class STNumpyPrinter(NumPyPrinter):
+    def _print_Max(self, expr):
+        return 'maximum(' + ','.join(self._print(i) for i in expr.args) + ')'
+
+    def _print_NaNProtect(self, expr):
+        return 'where(isnan(' + ','.join(self._print(a) for a in expr.args) + '), 0, ' \
+            + ','.join(self._print(a) for a in expr.args) + ')'
+
+    def _print_Missing(self, expr):
+        return 'isnan(' + ','.join(self._print(a) for a in expr.args) + ').astype(float)'
+    
+numpy_template_filename = os.path.join(resources, 'numpy_template.mako.py')
+with open(numpy_template_filename) as infile:
+    numpy_template = Template(infile.read())
+
+def numpy_str(function_name, estimator, method=sym_predict):
+    input_names = [sym.name for sym in syms(estimator)]
+    expression = method(estimator)
+    return numpy_template.render(function_name=function_name, input_names=input_names,
+                                      function_code=STNumpyPrinter().doprint(expression))
+
+class STPythonPrinter(PythonPrinter):
+    def _print_Float(self, expr):
+        return str(expr)
+    
+    def _print_Not(self, expr):
+        return 'negate(' + ','.join(self._print(i) for i in expr.args) + ')'
+    
+    def _print_Max(self, expr):
+        return 'max(' + ','.join(self._print(i) for i in expr.args) + ')'
+    
+    def _print_NaNProtect(self, expr):
+        return 'nanprotect(' + ','.join(self._print(i) for i in expr.args) + ')'
+
+    def _print_Missing(self, expr):
+        return 'missing(' + ','.join(self._print(i) for i in expr.args) + ')'
+
+python_template_filename = os.path.join(resources, 'python_template.mako.py')
+with open(python_template_filename) as infile:
+    python_template = Template(infile.read())
+
+def python_str(function_name, estimator, method=sym_predict):
+    input_names = [sym.name for sym in syms(estimator)]
+    expression = method(estimator)
+    return python_template.render(function_name=function_name, input_names=input_names,
+                                      function_code=STPythonPrinter().doprint(expression))
+
 
