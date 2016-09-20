@@ -6,6 +6,7 @@ from sklearn.cross_validation import check_cv
 from sklearn.externals.joblib.parallel import Parallel, delayed
 import numpy as np
 from sklearn.utils.metaestimators import if_delegate_has_method
+from sym import sym_transform, sym_predict, sym_predict_proba, syms
 
 def _fit_and_predict(estimator, X, y, train, test, sample_weight=None, exposure=None):
     '''
@@ -62,6 +63,15 @@ class ThresholdClassifier(STSimpleEstimator, MetaEstimatorMixin):
         if exposure is not None:
             clas_args['exposure'] = exposure
         return safe_call(self.classifier_.predict_proba, clas_args)
+    
+    def sym_predict(self):
+        return sym_predict(self.classifier_)
+    
+    def syms(self):
+        return syms(self.classifier_)
+    
+    def sym_predict_proba(self):
+        return sym_predict_proba(self.classifier_)
     
     @if_delegate_has_method(delegate='classifier')
     def predict_log_proba(self, X, exposure=None):
@@ -398,6 +408,15 @@ class ProbaPredictingEstimator(DelegatingEstimator):
     def predict(self, X, *args, **kwargs):
         return self.estimator_.predict_proba(X, *args, **kwargs)[:, 1:]
     
+    def sym_transform(self):
+        return sym_transform(self.estimator_)
+    
+    def sym_predict(self):
+        return sym_predict_proba(self.estimator_)
+    
+    def syms(self):
+        return syms(self.estimator_)
+        
 class ResponseTransformingEstimator(DelegatingEstimator):
     def __init__(self, estimator, transformer, est_weight=False, est_exposure=False, trans_weight=False,
                  trans_exposure=False):

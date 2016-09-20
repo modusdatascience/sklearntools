@@ -404,7 +404,6 @@ def test_non_null_row_subset_fitter():
     assert np.max(np.abs(np.ravel(beta) - model.estimator_.coef_)) < .001
 
 if __name__ == '__main__':
-    test_adaboost_classifier_with_earth_and_missingness()
     test_single_elimination_feature_importance_estimator_cv()
     test_univariate_feature_importance_estimator_cv()
     test_k_best_feature_selector()

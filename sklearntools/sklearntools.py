@@ -9,7 +9,7 @@ from sklearn.utils.metaestimators import if_delegate_has_method
 from six import with_metaclass
 from functools import update_wrapper
 from inspect import getargspec
-from _collections import defaultdict
+from sym import syms, sym_update, sym_predict
 
 def safe_call(fn, args):
     if hasattr(fn, '_spec'):
@@ -157,6 +157,23 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
             except AttributeError:
                 data['X'] = safe_call(stage.transform, self._transform_args(data))
     
+    def _sym_update(self):
+        expressions = None
+        for stage in self.intermediate_stages_:
+            stage_expressions = sym_update(stage)
+            if expressions is not None:
+                new_expressions = []
+                inputs = syms(stage)
+                for expr in stage_expressions:
+                    assert not set(inputs) & expr.free_symbols, 'Name collision in stage symbols'
+                    new_expr = expr
+                    for var, input_expr in zip(inputs, expressions):
+                        new_expressions.append(new_expr.subs(var, input_expr))
+                expressions = new_expressions
+            else:
+                expressions = stage_expressions
+        return expressions
+ 
     def fit(self, X, y=None, sample_weight=None, exposure=None):
         data = self._process_args(X=X, y=y, sample_weight=sample_weight, exposure=exposure)
         self.intermediate_stages_ = []
@@ -181,6 +198,17 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
         data = self._process_args(X=X, exposure=exposure)
         self._update(data)
         return safe_call(self.final_stage_.transform, data)
+    
+    def sym_predict(self):
+        expressions = self._sym_update()
+        expression = sym_predict(self.final_stage_)
+        symbols =  syms(self.final_stage_)
+        for expr, sym in zip(expressions, symbols):
+            expression = expression.subs(sym, expr)
+        return expression
+    
+    def syms(self):
+        return syms(self.intermediate_stages_[0])
     
     def predict(self, X, exposure=None):
         data = self._process_args(X=X, exposure=exposure)
@@ -385,18 +413,18 @@ class DelegatingEstimator(BaseDelegatingEstimator):
     def __init__(self, estimator):
         self.estimator = estimator
 
-class EstimatorStage(DelegatingEstimator):
-    def __init__(self, estimator, method_args):
-        self.estimator = estimator
-        self._create_delegates('estimator', standard_methods)
-        
-    def update(self, data):
-        '''
-        Update data in place to pass to the next stage in a pipeline.
-        '''
-class TransformerStage(EstimatorStage):
-    def update(self, data):
-        data['X'] = self.transform(**data)
+# class EstimatorStage(DelegatingEstimator):
+#     def __init__(self, estimator, method_args):
+#         self.estimator = estimator
+#         self._create_delegates('estimator', standard_methods)
+#         
+#     def update(self, data):
+#         '''
+#         Update data in place to pass to the next stage in a pipeline.
+#         '''
+# class TransformerStage(EstimatorStage):
+#     def update(self, data):
+#         data['X'] = self.transform(**data)
         
 # class ConcatenatingResponseStage(EstimatorStage):
 #     def update(self, data):
