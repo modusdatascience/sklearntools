@@ -7,4 +7,5 @@ setup(name='sklearntools',
       author_email='jcrudy@gmail.com',
       url='https://gitlab.com/jcrudy/sklearntools',
       packages=['sklearntools'],
+      package_data = {'': ['resources/*']},
      )
