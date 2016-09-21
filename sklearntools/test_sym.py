@@ -7,6 +7,13 @@ from sym import STNumpyPrinter, STJavaScriptPrinter
 import pandas
 from sym import javascript_str, numpy_str, python_str
 from numpy.ma.testutils import assert_array_almost_equal
+import imp
+import execjs
+
+def exec_module(name, code):
+    module = imp.new_module(name)
+    exec code in module.__dict__
+    return module
 
 def test_sympy_export():
     np.random.seed(1)
@@ -23,23 +30,19 @@ def test_sympy_export():
     model = Earth(allow_missing=True, max_terms=10) >> ProbaPredictingEstimator(ThresholdClassifier(LogisticRegression()))
     model.fit(X, y)
     
-    expression = model.sym_predict()
-    print model.intermediate_stages_[0].summary()
-    print expression
-    printer = STNumpyPrinter()
-    print printer.doprint(expression)
-    jsprinter = STJavaScriptPrinter()
-    print jsprinter.doprint(expression)
-    print javascript_str('test_model', model)
-    print numpy_str('test_model', model)
-    print python_str('test_model', model)
+    numpy_test_module = exec_module('numpy_test_module', numpy_str('test_model', model))
+    y_pred = numpy_test_module.test_model(col3=X['col3'], col8=X['col8'])
+    assert_array_almost_equal(np.ravel(y_pred), np.ravel(model.predict(X)))
     
-    import sys,imp
-    python_code = numpy_str('test_model', model)
-    test_module = imp.new_module('test_module')
-    exec python_code in test_module.__dict__
+    python_test_module = exec_module('python_test_module', python_str('test_model', model))
+    y_pred = [python_test_module.test_model(col3=row['col3'], col8=row['col8']) for i, row in X.iterrows()]
+    assert_array_almost_equal(np.ravel(y_pred), np.ravel(model.predict(X)))
     
-    y_pred = test_module.test_model(col3=X['col3'], col8=X['col8'])
+    js = execjs.get()
+    context = js.compile(javascript_str('test_model', model))
+    y_pred = [context.eval('test_model(col3=%s, col8=%s)' % (str(row['col3']) if not np.isnan(row['col3']) else 'NaN', 
+                                                             str(row['col8']) if not np.isnan(row['col8']) else 'NaN')) 
+              for i, row in X.iterrows()]
     assert_array_almost_equal(np.ravel(y_pred), np.ravel(model.predict(X)))
     
 if __name__ == '__main__':
