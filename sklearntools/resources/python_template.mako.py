@@ -1,4 +1,4 @@
-from math import isnan
+from math import isnan, exp
 def nanprotect(val):
     if isnan(val):
         return 0.

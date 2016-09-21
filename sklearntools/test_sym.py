@@ -6,6 +6,7 @@ from calibration import ProbaPredictingEstimator,\
 from sym import STNumpyPrinter, STJavaScriptPrinter
 import pandas
 from sym import javascript_str, numpy_str, python_str
+from numpy.ma.testutils import assert_array_almost_equal
 
 def test_sympy_export():
     np.random.seed(1)
@@ -32,6 +33,14 @@ def test_sympy_export():
     print javascript_str('test_model', model)
     print numpy_str('test_model', model)
     print python_str('test_model', model)
+    
+    import sys,imp
+    python_code = numpy_str('test_model', model)
+    test_module = imp.new_module('test_module')
+    exec python_code in test_module.__dict__
+    
+    y_pred = test_module.test_model(col3=X['col3'], col8=X['col8'])
+    assert_array_almost_equal(np.ravel(y_pred), np.ravel(model.predict(X)))
     
 if __name__ == '__main__':
     test_sympy_export()
