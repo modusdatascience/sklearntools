@@ -3,7 +3,6 @@ from earth import Earth
 from sklearn.linear_model.logistic import LogisticRegression
 from calibration import ProbaPredictingEstimator,\
     ThresholdClassifier
-from sym import STNumpyPrinter, STJavaScriptPrinter
 import pandas
 from sym import javascript_str, numpy_str, python_str
 from numpy.ma.testutils import assert_array_almost_equal
