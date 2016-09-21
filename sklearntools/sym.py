@@ -12,6 +12,7 @@ import os
 from resources import resources
 from mako.template import Template
 from sympy.printing.python import PythonPrinter
+import autopep8
 
 def call_method_or_dispatch(method_name, dispatcher):
     def _call_method_or_dispatch(estimator, *args, **kwargs):
@@ -102,9 +103,10 @@ javascript_template_filename = os.path.join(resources, 'javascript_template.mako
 with open(javascript_template_filename) as infile:
     javascript_template = Template(infile.read())
 
-def javascript_str(function_name, estimator, method=sym_predict):
-    input_names = [sym.name for sym in syms(estimator)]
+def javascript_str(function_name, estimator, method=sym_predict, all_variables=False):
     expression = method(estimator)
+    used_names = expression.free_symbols
+    input_names = [sym.name for sym in syms(estimator) if sym in used_names or all_variables]
     return javascript_template.render(function_name=function_name, input_names=input_names,
                                       function_code=STJavaScriptPrinter().doprint(expression))
 
@@ -123,11 +125,12 @@ numpy_template_filename = os.path.join(resources, 'numpy_template.mako.py')
 with open(numpy_template_filename) as infile:
     numpy_template = Template(infile.read())
 
-def numpy_str(function_name, estimator, method=sym_predict):
-    input_names = [sym.name for sym in syms(estimator)]
+def numpy_str(function_name, estimator, method=sym_predict, all_variables=False):
     expression = method(estimator)
-    return numpy_template.render(function_name=function_name, input_names=input_names,
-                                      function_code=STNumpyPrinter().doprint(expression))
+    used_names = expression.free_symbols
+    input_names = [sym.name for sym in syms(estimator) if sym in used_names or all_variables]
+    return autopep8.fix_code(numpy_template.render(function_name=function_name, input_names=input_names,
+                                      function_code=STNumpyPrinter().doprint(expression)), options={'aggressive': 1})
 
 class STPythonPrinter(PythonPrinter):
     def _print_Float(self, expr):
@@ -149,10 +152,11 @@ python_template_filename = os.path.join(resources, 'python_template.mako.py')
 with open(python_template_filename) as infile:
     python_template = Template(infile.read())
 
-def python_str(function_name, estimator, method=sym_predict):
-    input_names = [sym.name for sym in syms(estimator)]
+def python_str(function_name, estimator, method=sym_predict, all_variables=False):
     expression = method(estimator)
-    return python_template.render(function_name=function_name, input_names=input_names,
-                                      function_code=STPythonPrinter().doprint(expression))
+    used_names = expression.free_symbols
+    input_names = [sym.name for sym in syms(estimator) if sym in used_names or all_variables]
+    return autopep8.fix_code(python_template.render(function_name=function_name, input_names=input_names,
+                                      function_code=STPythonPrinter().doprint(expression)), options={'aggressive': 1})
 
 
