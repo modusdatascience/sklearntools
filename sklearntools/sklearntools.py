@@ -165,10 +165,8 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
                 new_expressions = []
                 inputs = syms(stage)
                 for expr in stage_expressions:
-                    assert not set(inputs) & expr.free_symbols, 'Name collision in stage symbols'
-                    new_expr = expr
-                    for var, input_expr in zip(inputs, expressions):
-                        new_expressions.append(new_expr.subs(var, input_expr))
+#                     assert not set(inputs) & expr.free_symbols, 'Name collision in stage symbols'
+                    new_expressions.append(expr.subs(dict(zip(inputs, expressions))))
                 expressions = new_expressions
             else:
                 expressions = stage_expressions
