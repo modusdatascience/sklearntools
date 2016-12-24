@@ -93,6 +93,30 @@ class SklearnTool(object):
 #     return result
 
 class STEstimator(BaseEstimator, SklearnTool):
+    def __sub__(self, other):
+        '''
+        self - other
+        '''
+        return self + (-1. * other)
+    
+    def __rsub__(self, other):
+        '''
+        other - self
+        '''
+        return other + (-1. * self)
+    
+    def __rmul__(self, factor):
+        return self.__mul__(factor)
+    
+    def __radd__(self, other):
+        return self.__add__(other)
+    
+    def __mul__(self, factor):
+        return LinearCombination([self], [factor])
+    
+    def __add__(self, other):
+        return (1.0 * self) + other
+    
     def _process_args(self, **kwargs):
         result = {}
         for k, v in kwargs.items():
@@ -243,7 +267,6 @@ def staged(estimator):
 #         return STPipeline([(name_estimator(estimator), estimator)])
 
 class STSimpleEstimator(STEstimator):
-    
     def __rshift__(self, other):
         '''
         self >> other
@@ -284,8 +307,43 @@ class STSimpleEstimator(STEstimator):
 #         names = [step[0] for step in steps]
 #         estimators = [step[1] for step in steps]
 #         return STPipeline(zip(combine_named_estimators(names), estimators))
+class LinearCombination(STSimpleEstimator, MetaEstimatorMixin):
+    def __init__(self, estimators, coefficients):
+        self.estimators = estimators
+        self.coefficients = coefficients
+        assert len(self.estimators) == len(self.coefficients)
+    
+    def fit(self, X, y=None, sample_weight=None, exposure=None):
+        raise NotImplementedError('Linear combinations should only be created after fitting.')
+    
+    def predict(self, X, exposure=None):
+        data = self._process_args(X=X, exposure=exposure)
+        prediction = self.coefficients[0]*self.estimators[0].predict(**data)
+        if len(prediction.shape) == 2 and prediction.shape[1] == 1:
+            prediction = np.ravel(prediction)
+            ravel = True
+        elif len(prediction.shape) == 1:
+            ravel = True
+        else:
+            ravel = False
+        for i, estimator in enumerate(self.estimators[1:]):
+            
+            prediction += self.coefficients[i+1] * (np.ravel(estimator.predict(**data)) if ravel else estimator.predict(**data))
+        return prediction
+    
+    def __mul__(self, factor):
+        estimators = [est for est in self.estimators]
+        coefficients = [coeff * factor for coeff in self.coefficients]
+        return LinearCombination(estimators, coefficients)
+    
+    def __add__(self, other):
+        if isinstance(other, LinearCombination):
+            estimators = self.estimators + other.estimators
+            coefficients = self.coefficients + other.coefficients
+            return LinearCombination(estimators, coefficients)
+        else:
+            return self + LinearCombination([other], [1.0])
 
-#         
 class _BasicDelegateDescriptor(object):
     def __init__(self, fn, delegate_name):
         self.fn = fn
@@ -410,6 +468,9 @@ class DelegatingEstimator(BaseDelegatingEstimator):
                   'predict_log_proba': 'estimator', 'transform': 'estimator'}
     def __init__(self, estimator):
         self.estimator = estimator
+
+def st(estimator):
+    return DelegatingEstimator(estimator)
 
 # class EstimatorStage(DelegatingEstimator):
 #     def __init__(self, estimator, method_args):

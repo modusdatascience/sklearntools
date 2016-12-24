@@ -24,6 +24,8 @@ import pandas
 from model_selection import ModelSelectorCV
 from scoring import log_loss_scorer
 from sklearn.ensemble.forest import RandomForestRegressor
+from numpy.ma.testutils import assert_array_almost_equal
+from earth import Earth
 warnings.simplefilter("error")
     
 def test_single_elimination_feature_importance_estimator_cv():
@@ -403,6 +405,26 @@ def test_non_null_row_subset_fitter():
     model.fit(X, y)
     assert np.max(np.abs(np.ravel(beta) - model.estimator_.coef_)) < .001
 
+def test_linear_transformation():
+    np.random.seed(1)
+    
+    m = 10000
+    n = 10
+
+    X = np.random.normal(size=(m,n))
+    beta1 = np.random.normal(size=(n,1))
+    y1 = np.ravel(np.dot(X, beta1))
+    
+    beta2 = np.random.normal(size=(n,1))
+    y2 = np.ravel(np.dot(X, beta2))
+    
+    model1 = (Earth() >> LinearRegression()).fit(X, y1)
+    model2 = Earth().fit(X, y2)
+    
+    combination = 2*model1 - model2
+    
+    assert_array_almost_equal(combination.predict(X), 2 * np.ravel(model1.predict(X)) - np.ravel(model2.predict(X)))
+    
 if __name__ == '__main__':
     test_single_elimination_feature_importance_estimator_cv()
     test_univariate_feature_importance_estimator_cv()
@@ -419,6 +441,7 @@ if __name__ == '__main__':
     test_column_subset_transformer()
     test_model_selector_cv()
     test_non_null_row_subset_fitter()
+    test_linear_transformation()
     print 'Success!'
     
     
