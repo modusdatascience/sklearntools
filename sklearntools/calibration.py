@@ -270,7 +270,10 @@ class CalibratedEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
         if self.cv == 1:
             cv = no_cv(X=X, y=y)
         else:
-            cv = check_cv(self.cv, X=X, y=y, classifier=is_classifier(self.calibrator))
+            if hasattr(self.cv, 'split'):
+                cv = self.cv.split(X, y)
+            else:
+                cv = check_cv(self.cv, X=X, y=y, classifier=is_classifier(self.calibrator))
         parallel = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
                         pre_dispatch=self.pre_dispatch)
         

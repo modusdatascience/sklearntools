@@ -26,6 +26,9 @@ from scoring import log_loss_scorer
 from sklearn.ensemble.forest import RandomForestRegressor
 from numpy.ma.testutils import assert_array_almost_equal
 from earth import Earth
+from kfold import CrossValidatingEstimator
+from sklearn.metrics.regression import r2_score
+from sklearn.model_selection import KFold
 warnings.simplefilter("error")
     
 def test_single_elimination_feature_importance_estimator_cv():
@@ -157,7 +160,7 @@ def test_calibration():
 #     estimator = linear_regressor & calibrator
 #     MultipleResponseEstimator([('estimator', np.array([True, False], dtype=bool), LinearRegression())])
 #     calibrator = MultipleResponseEstimator([('calibrator', np.array([False, True], dtype=bool), LogisticRegression())])
-    model = CalibratedEstimatorCV(estimator, calibrator)
+    model = CalibratedEstimatorCV(estimator, calibrator, cv=KFold(n_splits=4, shuffle=True), n_jobs=2)
     model.fit(X, y)
     assert np.max(beta[:, 0] - model.estimator_.estimator_.coef_) < .000001
     assert np.max(model.calibrator_.estimator_.coef_ - 1.) < .1
@@ -386,6 +389,25 @@ def test_model_selector_cv():
     model.fit(X, rate, exposure=exposure)
     np.testing.assert_array_equal(model.best_estimator_.intermediate_stages_[0].x_cols, best_subset)
 
+def test_cross_validating_estimator():
+    np.random.seed(1)
+    
+    m = 10000
+    n = 10
+    
+    X = np.random.normal(size=(m,n))
+    beta = np.random.normal(size=(n,1))
+    y = np.ravel(np.dot(X, beta)) + np.random.normal(.5, size=m)
+    
+    model = CrossValidatingEstimator(LinearRegression(), cv=KFold(n_splits=4, shuffle=True), n_jobs=2)
+    
+    y_pred_cv = model.fit_predict(X, y)
+    
+    y_pred = model.predict(X)
+    
+    assert r2_score(np.ravel(y_pred_cv), np.ravel(y_pred)) > .98
+    
+
 def test_non_null_row_subset_fitter():
     np.random.seed(1)
     
@@ -426,6 +448,7 @@ def test_linear_transformation():
     assert_array_almost_equal(combination.predict(X), 2 * np.ravel(model1.predict(X)) - np.ravel(model2.predict(X)))
     
 if __name__ == '__main__':
+    test_cross_validating_estimator()
     test_single_elimination_feature_importance_estimator_cv()
     test_univariate_feature_importance_estimator_cv()
     test_k_best_feature_selector()

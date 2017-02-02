@@ -44,7 +44,11 @@ class ModelSelectorCV(BaseDelegatingEstimator):
             if self.cv == 1:
                 cv = no_cv(X=X, y=y)
             else:
-                cv = check_cv(self.cv, X=X, y=y, classifier=is_classifier(candidate))
+                if hasattr(self.cv, 'split'):
+                    cv = self.cv.split(X, y)
+                else:
+                    cv = check_cv(self.cv, X=X, y=y, classifier=is_classifier(candidate))
+                    
             scorer = check_scoring(candidate, scoring=self.scoring)
             combiner = check_score_combiner(candidate, self.score_combiner)
             

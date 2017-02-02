@@ -41,12 +41,12 @@ def test_sympy_export():
     context = js.compile(javascript_str('test_model', model))
     y_pred = [context.eval('test_model(col3=%s, col8=%s)' % (str(row['col3']) if not np.isnan(row['col3']) else 'NaN', 
                                                              str(row['col8']) if not np.isnan(row['col8']) else 'NaN')) 
-              for i, row in X.iterrows()]
-    assert_array_almost_equal(np.ravel(y_pred), np.ravel(model.predict(X)))
+              for i, row in X.loc[:10,:].iterrows()]
+    assert_array_almost_equal(np.ravel(y_pred), np.ravel(model.predict(X.loc[:10,:])))
     
 if __name__ == '__main__':
     test_sympy_export()
-
+    print 'Success!'
     
     
 

@@ -10,6 +10,7 @@ from six import with_metaclass
 from functools import update_wrapper
 from inspect import getargspec
 from sym import syms, sym_update, sym_predict
+import pandas
 
 def safe_call(fn, args):
     if hasattr(fn, '_spec'):
@@ -46,12 +47,15 @@ def safer_call(fn, *args, **kwargs):
                 del kwargs[name]
     return fn(*args, **kwargs)
 
+def safe_concat(arrays):
+    return pandas.concat([pandas.DataFrame(arr) for arr in arrays], axis=0).as_matrix()
+
 def _subset(data, idx):
     if len(data.shape) == 1:
         return data[idx]
     else:
         if hasattr(data, 'loc'):
-            return data.loc[idx, :]
+            return data.reset_index(drop=True).loc[idx, :]
         else:
             return data[idx, :]
 
@@ -61,12 +65,29 @@ def _subset_data(data, idx):
         result[k] = _subset(data[k], idx)
     return result
 
+def safe_assign_subset(arr, idx, value):
+    try:
+        arr.loc[idx, :] = value
+    except AttributeError:
+        try:
+            arr[idx, :] = value.reshape(arr[idx, :].shape)
+        except:
+            arr.flat[idx] = value
+    
+
 def _fit_and_score(estimator, data, scorer, train, test):
     train_data = _subset_data(data, train)
     estimator_ = clone(estimator).fit(**train_data)
     test_data = _subset_data(data, test)
     score = safer_call(scorer, estimator_, **test_data)
     return (score, np.sum(test))
+
+def _fit_and_predict(estimator, data, train, test):
+    train_data = _subset_data(data, train)
+    estimator_ = clone(estimator).fit(**train_data)
+    test_data = _subset_data(data, test)
+    prediction = safer_call(estimator_.predict, **test_data)
+    return estimator_, prediction, test
 
 class SklearnTool(object):
     pass
@@ -235,7 +256,10 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
     def predict(self, X, exposure=None):
         data = self._process_args(X=X, exposure=exposure)
         self._update(data)
-        return safe_call(self.final_stage_.predict, data)
+        try:
+            return safe_call(self.final_stage_.predict, data)
+        except:
+            return safe_call(self.final_stage_.predict, data)
         
     def predict_proba(self, X, exposure=None):
         data = self._process_args(X=X, exposure=exposure)
