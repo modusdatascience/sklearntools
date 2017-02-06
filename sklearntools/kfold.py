@@ -4,6 +4,7 @@ from sklearn.cross_validation import check_cv
 from sklearn.base import is_classifier, clone
 from sklearntools import _fit_and_predict, standard_methods, BaseDelegatingEstimator, safe_assign_subset
 import numpy as np
+from sym import sym_predict, syms
 
 class CrossValidatingEstimator(BaseDelegatingEstimator):
     def __init__(self, estimator, cv=2, n_jobs=1, verbose=0, 
@@ -18,6 +19,12 @@ class CrossValidatingEstimator(BaseDelegatingEstimator):
     @property
     def _estimator_type(self):
         return self.estimator._estimator_type
+    
+    def sym_predict(self):
+        return sym_predict(self.estimator_)
+    
+    def syms(self):
+        return syms(self.estimator_)
     
     def fit_predict(self, X, y=None, sample_weight=None, exposure=None):
         # For later
@@ -38,8 +45,7 @@ class CrossValidatingEstimator(BaseDelegatingEstimator):
                 cv = check_cv(self.cv, X=X, y=y, classifier=is_classifier(self.estimator))
                 
         # Do the cross validation fits
-        cv_fits = parallel(delayed(_fit_and_predict)(clone(self.estimator), fit_args, train, test)
-                           for train, test in cv)
+        cv_fits = parallel(delayed(_fit_and_predict)(clone(self.estimator), fit_args, train, test) for train, test in cv)
         
         # Combine predictions from cv fits
         prediction = np.empty_like(y)

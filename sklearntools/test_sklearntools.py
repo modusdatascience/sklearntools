@@ -160,7 +160,7 @@ def test_calibration():
 #     estimator = linear_regressor & calibrator
 #     MultipleResponseEstimator([('estimator', np.array([True, False], dtype=bool), LinearRegression())])
 #     calibrator = MultipleResponseEstimator([('calibrator', np.array([False, True], dtype=bool), LogisticRegression())])
-    model = CalibratedEstimatorCV(estimator, calibrator, cv=KFold(n_splits=4, shuffle=True), n_jobs=2)
+    model = CalibratedEstimatorCV(estimator, calibrator, cv=KFold(n_splits=4, shuffle=True), n_jobs=1)
     model.fit(X, y)
     assert np.max(beta[:, 0] - model.estimator_.estimator_.coef_) < .000001
     assert np.max(model.calibrator_.estimator_.coef_ - 1.) < .1

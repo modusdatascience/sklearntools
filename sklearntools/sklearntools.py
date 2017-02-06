@@ -5,12 +5,24 @@ Created on Feb 11, 2016
 '''
 from sklearn.base import BaseEstimator, clone, MetaEstimatorMixin
 import numpy as np
-from sklearn.utils.metaestimators import if_delegate_has_method
+from sklearn.utils.metaestimators import if_delegate_has_method as sklearn_if_delegate_has_method
 from six import with_metaclass
 from functools import update_wrapper
 from inspect import getargspec
 from sym import syms, sym_update, sym_predict
 import pandas
+from sympy.functions.elementary.miscellaneous import Max, Min
+from sympy.core.numbers import RealNumber
+from decorator import decorator
+# 
+# def if_delegate_has_method(*args, **kwargs):
+#     return decorator(sklearn_if_delegate_has_method(*args, **kwargs))
+
+# @decorator
+def if_delegate_has_method(*args, **kwargs):
+    return lambda x: x
+#     print 'hello', fn
+#     return fn(*args, **kwargs)
 
 def safe_call(fn, args):
     if hasattr(fn, '_spec'):
@@ -29,12 +41,15 @@ def safe_call(fn, args):
         
 def safer_call(fn, *args, **kwargs):
     kwargs = kwargs.copy()
-    try:
-        spec = getargspec(fn)
-    except TypeError:
-        spec = getargspec(fn.__call__)
+    if hasattr(fn, '_spec'):
+        spec = fn._spec
+    else:
+        try:
+            spec = getargspec(fn)
+        except TypeError:
+            spec = getargspec(fn.__call__)
     spec_args = list(spec.args)
-    if spec_args[0] == 'self':
+    if spec_args and spec_args[0] == 'self':
         spec_args = spec_args[1:]
     if spec.varargs is None:
         for i, arg in enumerate(args):
@@ -541,7 +556,17 @@ class BoundedEstimator(DelegatingEstimator):
         self._create_delegates('estimator', ['fit', 'predict_proba', 'decision_function', 
                          'predict_log_proba', 'transform'])
     
-    @if_delegate_has_method('estimator')
+    def syms(self):
+        return syms(self.estimator_)
+    
+    def sym_predict(self):
+        result = sym_predict(self.estimator_)
+        if self.lower_bound > float('-inf'):
+            result = Max(result, RealNumber(self.lower_bound))
+        if self.upper_bound < float('inf'):
+            result = Min(result, RealNumber(self.upper_bound))
+        return result
+    
     def predict(self, X, exposure=None):
         data = self._process_args(X=X, exposure=exposure)
         raw_prediction = self.estimator_.predict(**data)

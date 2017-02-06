@@ -7,26 +7,27 @@ from sklearn.externals.joblib.parallel import Parallel, delayed
 import numpy as np
 from sklearn.utils.metaestimators import if_delegate_has_method
 from sym import sym_transform, sym_predict, sym_predict_proba, syms
+from sklearntools import safe_assign_subset, _fit_and_predict
 
-def _fit_and_predict(estimator, X, y, train, test, sample_weight=None, exposure=None):
-    '''
-    Fits on the train set and predicts on the test set.
-    '''
-    fit_args = {'X': _subset(X, train)}
-    if y is not None:
-        fit_args['y'] = _subset(y, train)
-    if sample_weight is not None:
-        fit_args['sample_weight'] = _subset(sample_weight, train)
-    if exposure is not None:
-        fit_args['exposure'] = _subset(exposure, train)
-    estimator.fit(**fit_args)
-    
-    predict_args = {'X': _subset(X, test)}
-    if exposure is not None:
-        predict_args['exposure'] = _subset(exposure, test)
-    prediction = estimator.predict(**predict_args)
-    
-    return estimator, prediction
+# def _fit_and_predict(estimator, X, y, train, test, sample_weight=None, exposure=None):
+#     '''
+#     Fits on the train set and predicts on the test set.
+#     '''
+#     fit_args = {'X': _subset(X, train)}
+#     if y is not None:
+#         fit_args['y'] = _subset(y, train)
+#     if sample_weight is not None:
+#         fit_args['sample_weight'] = _subset(sample_weight, train)
+#     if exposure is not None:
+#         fit_args['exposure'] = _subset(exposure, train)
+#     estimator.fit(**fit_args)
+#     
+#     predict_args = {'X': _subset(X, test)}
+#     if exposure is not None:
+#         predict_args['exposure'] = _subset(exposure, test)
+#     prediction = estimator.predict(**predict_args)
+#     
+#     return estimator, prediction
 
 class ThresholdClassifier(STSimpleEstimator, MetaEstimatorMixin):
     _estimator_type = 'classifier'
@@ -113,6 +114,12 @@ class MovingAverageSmoothingEstimator(DelegatingEstimator):
         self.sort_order = sort_order
         self.sort_algorithm = sort_algorithm
         self._create_delegates('estimator', non_fit_methods)
+        
+    def sym_predict(self):
+        return sym_predict(self.estimator_)
+    
+    def syms(self):
+        return syms(self.estimator_)
         
     def fit(self, X, y):
 #         if sample_weight is not None:
@@ -262,6 +269,20 @@ class CalibratedEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
         self.verbose = verbose
         self.pre_dispatch = pre_dispatch
     
+    def syms(self):
+        return syms(self.estimator_)
+    
+    def sym_predict(self):
+        est = sym_predict(self.estimator_)
+        cal = sym_predict(self.calibrator_)
+        cal_vars = syms(self.calibrator_)
+        assert len(cal_vars) == 1
+        return cal.subs(cal_vars[0], est)
+        
+    
+    def sym_transform(self):
+        return sym_transform(self.estimator_)
+    
     @property
     def _estimator_type(self):
         return self.calibrator._estimator_type
@@ -285,11 +306,23 @@ class CalibratedEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
             fit_args['sample_weight'] = sample_weight
         if self.est_exposure and exposure is not None:
             fit_args['exposure'] = exposure
-        fit_predict_results = parallel(delayed(_fit_and_predict)(estimator=clone(self.estimator),
-                                       train=train, test=test, **fit_args) for train, test in cv)
         
-        # Combine the predictions
-        prediction = np.concatenate([pred for _, pred in fit_predict_results], axis=0)
+        # Do the cross validation fits
+        cv_fits = parallel(delayed(_fit_and_predict)(clone(self.estimator), fit_args, train, test) for train, test in cv)
+        
+        # Combine predictions from cv fits
+        prediction = np.empty_like(y)
+        for fit in cv_fits:
+            safe_assign_subset(prediction, fit[2], fit[1])
+        
+#         fit_predict_results = parallel(delayed(_fit_and_predict)(estimator=clone(self.estimator),
+#                                        train=train, test=test, **fit_args) for train, test in cv)
+#         
+#         # Combine the predictions
+#         prediction = np.empty_like(y)
+#         for _, pred, _, test in zip(fit_predict_results, cv):
+            
+#         prediction = np.concatenate([pred for _, pred in cv_fits], axis=0)
         
         # Fit the calibrator on the predictions
         cal_args = {'X': prediction[:, None] if len(prediction.shape) == 1 else prediction, 
@@ -431,6 +464,14 @@ class ResponseTransformingEstimator(DelegatingEstimator):
         self.trans_exposure = trans_exposure
         self._create_delegates('estimator', ['predict', 'transform', 'predict_proba', 
                                              'predict_log_proba', 'decision_function'])
+    def syms(self):
+        return syms(self.estimator_)
+    
+    def sym_predict(self):
+        return sym_predict(self.estimator_)
+    
+    def sym_transform(self):
+        return sym_transform(self.estimator_)
     
     @property
     def _estimator_type(self):

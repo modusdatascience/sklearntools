@@ -92,6 +92,9 @@ sym_update = fallback(call_method_or_dispatch('sym_update', sym_update_dispatche
 class STJavaScriptPrinter(JavascriptCodePrinter):
     def _print_Max(self, expr):
         return 'Math.max(' + ','.join(self._print(i) for i in expr.args) + ')'
+    
+    def _print_Min(self, expr):
+        return 'Math.min(' + ','.join(self._print(i) for i in expr.args) + ')'
  
     def _print_NaNProtect(self, expr):
         return 'nanprotect(' + ','.join(self._print(i) for i in expr.args) + ')'
@@ -113,6 +116,9 @@ def javascript_str(function_name, estimator, method=sym_predict, all_variables=F
 class STNumpyPrinter(NumPyPrinter):
     def _print_Max(self, expr):
         return 'maximum(' + ','.join(self._print(i) for i in expr.args) + ')'
+    
+    def _print_Min(self, expr):
+        return 'minimum(' + ','.join(self._print(i) for i in expr.args) + ')'
 
     def _print_NaNProtect(self, expr):
         return 'where(isnan(' + ','.join(self._print(a) for a in expr.args) + '), 0, ' \
@@ -129,8 +135,9 @@ def numpy_str(function_name, estimator, method=sym_predict, all_variables=False)
     expression = method(estimator)
     used_names = expression.free_symbols
     input_names = [sym.name for sym in syms(estimator) if sym in used_names or all_variables]
+    function_code = STNumpyPrinter().doprint(expression)
     return autopep8.fix_code(numpy_template.render(function_name=function_name, input_names=input_names,
-                                      function_code=STNumpyPrinter().doprint(expression)), options={'aggressive': 1})
+                                      function_code=function_code), options={'aggressive': 1})
 
 class STPythonPrinter(PythonPrinter):
     def _print_Float(self, expr):
@@ -141,6 +148,9 @@ class STPythonPrinter(PythonPrinter):
     
     def _print_Max(self, expr):
         return 'max(' + ','.join(self._print(i) for i in expr.args) + ')'
+    
+    def _print_Min(self, expr):
+        return 'min(' + ','.join(self._print(i) for i in expr.args) + ')'
     
     def _print_NaNProtect(self, expr):
         return 'nanprotect(' + ','.join(self._print(i) for i in expr.args) + ')'

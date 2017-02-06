@@ -1,4 +1,6 @@
 from .sklearntools import STSimpleEstimator
+from sympy.core.symbol import Symbol
+from sym import syms_x, syms
 
 
 class Pandable(object):
@@ -15,6 +17,18 @@ class InputFixingTransformer(STSimpleEstimator, Pandable):
         self.responses = responses
         self.sample_weights = sample_weights
         self.exposure = exposure
+    
+    def syms(self):
+        try:
+            return [Symbol(predictor) for predictor in self.predictors_]
+        except TypeError:
+            return syms_x(self)
+        
+    def sym_transform(self):
+        return syms(self)
+        
+    def input_size(self):
+        return len(self.predictors_)
         
     def fit(self, X, y, sample_weights=None, exposure=None):
         if self.predictors is None:
