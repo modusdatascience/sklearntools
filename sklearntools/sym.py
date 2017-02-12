@@ -131,13 +131,16 @@ numpy_template_filename = os.path.join(resources, 'numpy_template.mako.py')
 with open(numpy_template_filename) as infile:
     numpy_template = Template(infile.read())
 
-def numpy_str(function_name, estimator, method=sym_predict, all_variables=False):
+def numpy_str(function_name, estimator, method=sym_predict, all_variables=False, pep8=False):
     expression = method(estimator)
     used_names = expression.free_symbols
     input_names = [sym.name for sym in syms(estimator) if sym in used_names or all_variables]
     function_code = STNumpyPrinter().doprint(expression)
-    return autopep8.fix_code(numpy_template.render(function_name=function_name, input_names=input_names,
-                                      function_code=function_code), options={'aggressive': 1})
+    result = numpy_template.render(function_name=function_name, input_names=input_names,
+                                      function_code=function_code)
+    if pep8:
+        result =  autopep8.fix_code(result, options={'aggressive': 1})
+    return result
 
 class STPythonPrinter(PythonPrinter):
     def _print_Float(self, expr):

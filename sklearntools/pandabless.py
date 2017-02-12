@@ -1,10 +1,16 @@
 from .sklearntools import STSimpleEstimator
 from sympy.core.symbol import Symbol
 from sym import syms_x, syms
-
+import numpy as np
 
 class Pandable(object):
     pass
+
+def identity(x):
+    return x
+
+def numpify(x):
+    return np.asarray(x).copy()
 
 class InputFixingTransformer(STSimpleEstimator, Pandable):
     '''
@@ -12,11 +18,12 @@ class InputFixingTransformer(STSimpleEstimator, Pandable):
     from inputs during updates and transforms.
     '''
     
-    def __init__(self, predictors=None, responses=None, sample_weights=None, exposure=None):
+    def __init__(self, predictors=None, responses=None, sample_weights=None, exposure=None, output_constructor=identity):
         self.predictors = predictors
         self.responses = responses
         self.sample_weights = sample_weights
         self.exposure = exposure
+        self.output_constructor = output_constructor
     
     def syms(self):
         try:
@@ -96,7 +103,7 @@ class InputFixingTransformer(STSimpleEstimator, Pandable):
     
     def transform(self, X, exposure=None):
         x_index = self._x_index()
-        return X[x_index]
+        return self.output_constructor(X[x_index])
         
     def update(self, data):
         y_index = self._y_index()
@@ -106,32 +113,32 @@ class InputFixingTransformer(STSimpleEstimator, Pandable):
         
         if 'y' in data:
             if y_index is not None:
-                data['y'] = data['y'][y_index]
+                data['y'] = self.output_constructor(data['y'][y_index])
         elif y_index is not None:
             try:
-                data['y'] = data['X'][y_index]
+                data['y'] = self.output_constructor(data['X'][y_index])
             except KeyError:
                 pass
         
         if 'sample_weight' in data:
             if weight_index is not None:
-                data['sample_weight'] = data['sample_weight'][weight_index]
+                data['sample_weight'] = self.output_constructor(data['sample_weight'][weight_index])
         elif weight_index is not None:
             try:
-                data['sample_weight'] = data['X'][weight_index]
+                data['sample_weight'] = self.output_constructor(data['X'][weight_index])
             except KeyError:
                 pass
         
         if 'exposure' in data:
             if exposure_index is not None:
-                data['exposure'] = data['exposure'][exposure_index]
+                data['exposure'] = self.output_constructor(data['exposure'][exposure_index])
         elif exposure_index is not None:
             try:
-                data['exposure'] = data['X'][exposure_index]
+                data['exposure'] = self.output_constructor(data['X'][exposure_index])
             except KeyError:
                 pass
         
         if 'X' in data:
             if x_index is not None:
-                data['X'] = data['X'][x_index]
+                data['X'] = self.output_constructor(data['X'][x_index])
         

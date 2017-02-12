@@ -228,16 +228,16 @@ def calibration_category_plot(category_table, observed, predicted,  obs_stat=mea
 
 def calibration_bin_plot(covariate, observed, predicted, obs_stat=mean, pred_stat=mean, pred_function=lambda obs, pred: pred, 
                          percent=95, n_bins=20, n_bootstraps=100, observed_label='Observed', predicted_label='Predicted', title=None):
-    error_bar_kwargs = {'marker':'.', 'linestyle':''}
+    error_bar_kwargs = {'marker':'+', 'linestyle':''}
     if observed_label is not None:
         error_bar_kwargs['label'] = observed_label
-    bin_error_bar_plot(covariate, pred_function(observed, predicted), n_bins, quantile(.5), obs_stat, bootstrap(quantile(.5 - percent / 200.), obs_stat, n_bootstraps), 
+    bin_error_bar_plot(covariate, observed, n_bins, quantile(.5), obs_stat, bootstrap(quantile(.5 - percent / 200.), obs_stat, n_bootstraps), 
                        bootstrap(quantile(.5 + percent / 200.), obs_stat, n_bootstraps), error_bar_kwargs, linestyle='')
 #     bin_plot(y_pred, y, n_bins, quantile(.5), mean, '.', label='Mean Observation')
 #     bin_plot(y_pred, y, n_bins, quantile(.5), mean_pm_std(1.), '.', label='Mean Observation + STD')
 #     bin_plot(y_pred, y, n_bins, quantile(.5), mean_pm_std(-1.), '.', label='Mean Observation - STD')
     if predicted_label is not None:
-        bin_plot(covariate, pred_function(observed, predicted), n_bins, quantile(.5), pred_stat, '.', label=predicted_label)
+        bin_plot(covariate, predicted, n_bins, quantile(.5), pred_stat, '.', label=predicted_label)
     plt.legend(loc='best')
     if title is not None:
         plt.title(title)

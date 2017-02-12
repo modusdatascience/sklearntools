@@ -8,6 +8,7 @@ import numpy as np
 from sklearn.utils.metaestimators import if_delegate_has_method
 from sym import sym_transform, sym_predict, sym_predict_proba, syms
 from sklearntools import safe_assign_subset, _fit_and_predict
+from sympy.core.symbol import Symbol
 
 # def _fit_and_predict(estimator, X, y, train, test, sample_weight=None, exposure=None):
 #     '''
@@ -234,7 +235,16 @@ class PredictorTransformer(DelegatingEstimator):
         if len(result.shape) == 1:
             result = result[:, None]
         return result
-
+    
+    def syms(self):
+        return self.estimator_.syms()
+    
+    def sym_transform(self):
+        return [self.sym_predict()]
+    
+    def sym_predict(self):
+        return self.estimator_.sym_predict()
+    
 class SelectorTransformer(STSimpleEstimator):
     '''
     Just grab some input columns and pass them through.
@@ -247,6 +257,12 @@ class SelectorTransformer(STSimpleEstimator):
     
     def transform(self, X, exposure=None):
         return safe_col_select(X, self.columns)
+    
+    def syms(self):
+        return [Symbol(col) for col in self.columns]
+    
+    def sym_transform(self):
+        return self.syms()
     
 def no_cv(X, y):
     yield np.ones(X.shape[0]).astype(bool), np.ones(X.shape[0]).astype(bool)

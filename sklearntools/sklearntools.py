@@ -14,6 +14,8 @@ import pandas
 from sympy.functions.elementary.miscellaneous import Max, Min
 from sympy.core.numbers import RealNumber
 from decorator import decorator
+from itertools import chain
+from sym import sym_transform
 # 
 # def if_delegate_has_method(*args, **kwargs):
 #     return decorator(sklearn_if_delegate_has_method(*args, **kwargs))
@@ -69,8 +71,8 @@ def _subset(data, idx):
     if len(data.shape) == 1:
         return data[idx]
     else:
-        if hasattr(data, 'loc'):
-            return data.reset_index(drop=True).loc[idx, :]
+        if hasattr(data, 'iloc'):
+            return data.iloc[idx, :].reset_index(drop=True)
         else:
             return data[idx, :]
 
@@ -258,11 +260,18 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
         return safe_call(self.final_stage_.transform, data)
     
     def sym_predict(self):
-        expressions = self._sym_update()
-        expression = sym_predict(self.final_stage_)
-        symbols =  syms(self.final_stage_)
-        for expr, sym in zip(expressions, symbols):
-            expression = expression.subs(sym, expr)
+        try:
+            expressions = self._sym_update()
+            expression = sym_predict(self.final_stage_)
+            symbols =  syms(self.final_stage_)
+            for expr, sym in zip(expressions, symbols):
+                expression = expression.subs(sym, expr)
+        except:
+            expressions = self._sym_update()
+            expression = sym_predict(self.final_stage_)
+            symbols =  syms(self.final_stage_)
+            for expr, sym in zip(expressions, symbols):
+                expression = expression.subs(sym, expr)
         return expression
     
     def syms(self):
@@ -320,7 +329,6 @@ class STSimpleEstimator(STEstimator):
         
     def __lshift__(self, other):
         '''
-        self << other
         '''
         return staged(other) >> self
         
@@ -825,6 +833,12 @@ class MultiEstimator(STSimpleEstimator, MetaEstimatorMixin):
         for estimator in self.estimators:
             self.estimators_.append(clone(estimator).fit(**args))
         return self
+    
+    def syms(self):
+        return list(set(chain(*map(syms, self.estimators_))))
+    
+    def sym_transform(self):
+        return list(chain(*map(sym_transform, self.estimators_)))
     
     def transform(self, X, y=None, sample_weight=None, exposure=None):
         args = self._process_args(X=X, exposure=exposure)
