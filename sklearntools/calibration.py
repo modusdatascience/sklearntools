@@ -6,7 +6,7 @@ from sklearn.cross_validation import check_cv
 from sklearn.externals.joblib.parallel import Parallel, delayed
 import numpy as np
 from sklearn.utils.metaestimators import if_delegate_has_method
-from sym import sym_transform, sym_predict, sym_predict_proba, syms
+from sym import sym_transform, sym_predict, sym_predict_proba, syms, sym_predict_parts
 from sklearntools import safe_assign_subset, _fit_and_predict
 from sympy.core.symbol import Symbol
 
@@ -245,6 +245,10 @@ class PredictorTransformer(DelegatingEstimator):
     def sym_predict(self):
         return self.estimator_.sym_predict()
     
+    def sym_transform_parts(self, target=None):
+        print 'sym_transform_parts', self
+        return sym_predict_parts(self, target)
+    
 class SelectorTransformer(STSimpleEstimator):
     '''
     Just grab some input columns and pass them through.
@@ -294,7 +298,11 @@ class CalibratedEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
         cal_vars = syms(self.calibrator_)
         assert len(cal_vars) == 1
         return cal.subs(cal_vars[0], est)
-        
+    
+    def sym_predict_parts(self, target=None):
+        print 'sym_predict_parts', self
+        parts = sym_predict_parts(self.estimator_, target)
+        return sym_predict_parts(self.calibrator_, parts)
     
     def sym_transform(self):
         return sym_transform(self.estimator_)

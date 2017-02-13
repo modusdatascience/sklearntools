@@ -14,8 +14,8 @@ from mako.template import Template
 from sympy.printing.python import PythonPrinter
 import autopep8
 from _collections import defaultdict
-from itertools import chain
-from operator import add
+from itertools import chain, compress
+from operator import add, or_
 
 def call_method_or_dispatch(method_name, dispatcher):
     def _call_method_or_dispatch(estimator, *args, **kwargs):
@@ -119,6 +119,23 @@ def assemble_parts_into_expressions(parts):
     else:
         return inputs, expressions
     
+def trim_parts(parts, top=True):
+    inputs, expressions, target = parts
+    if target is None:
+        used_symbols = reduce(add, map(lambda x: x.free_symbols, expressions))
+        result, index_result = ([inp for inp in inputs if inp in used_symbols], expressions, None), [inp in used_symbols for inp in inputs]
+    else:
+        target_result, index = trim_parts(target, top=False)
+        used_expressions = list(compress(expressions, index))
+        used_symbols = reduce(or_, map(lambda x: x.free_symbols, used_expressions))
+        used_inputs = [inp for inp in inputs if inp in used_symbols]
+        new_index = [inp in used_symbols for inp in inputs]
+        result, index_result = (used_inputs, used_expressions, target_result), new_index
+    if top:
+        return result
+    else:
+        return result, index_result
+    
 def assemble_parts_into_assignment_pairs_and_outputs(parts):
     _, expressions, target = parts
     result = []
@@ -152,7 +169,13 @@ class STJavaScriptPrinter(JavascriptCodePrinter):
 javascript_template_filename = os.path.join(resources, 'javascript_template.mako.js')
 with open(javascript_template_filename) as infile:
     javascript_template = Template(infile.read())
+javascript_function_template_filename = os.path.join(resources, 'javascript_function_template.mako.js')
+with open(javascript_function_template_filename) as infile:
+    javascript_function_template = Template(infile.read())
 
+def javascript_assigner(symbols, function_name, input_symbols):
+    return 'var [%s] = %s(%s)' % (', '.join(symbols), function_name, ','.join(input_symbols))
+    
 def javascript_str(function_name, estimator, method=sym_predict, all_variables=False):
     expression = method(estimator)
     used_names = expression.free_symbols
@@ -177,6 +200,9 @@ class STNumpyPrinter(NumPyPrinter):
 numpy_template_filename = os.path.join(resources, 'numpy_template.mako.py')
 with open(numpy_template_filename) as infile:
     numpy_template = Template(infile.read())
+numpy_function_template_filename = os.path.join(resources, 'numpy_function_template.mako.py')
+with open(numpy_function_template_filename) as infile:
+    numpy_function_template = Template(infile.read())
 
 def numpy_str(function_name, estimator, method=sym_predict, all_variables=False, pep8=False):
     expression = method(estimator)
@@ -211,6 +237,9 @@ class STPythonPrinter(PythonPrinter):
 python_template_filename = os.path.join(resources, 'python_template.mako.py')
 with open(python_template_filename) as infile:
     python_template = Template(infile.read())
+python_function_template_filename = os.path.join(resources, 'python_function_template.mako.py')
+with open(python_function_template_filename) as infile:
+    python_function_template = Template(infile.read())
 
 def python_str(function_name, estimator, method=sym_predict, all_variables=False):
     expression = method(estimator)
@@ -218,7 +247,6 @@ def python_str(function_name, estimator, method=sym_predict, all_variables=False
     input_names = [sym.name for sym in syms(estimator) if sym in used_names or all_variables]
     return autopep8.fix_code(python_template.render(function_name=function_name, input_names=input_names,
                                       function_code=STPythonPrinter().doprint(expression)), options={'aggressive': 1})
-
 
 language_print_dispatcher = {
     'python': STPythonPrinter,
@@ -232,9 +260,16 @@ language_template_dispatcher = {
     'javascript': javascript_template 
     }
 
-language_assignment_statement_dispatcher = defaultdict(lambda: lambda symbol, expression: symbol + ' = ' + expression)
+language_function_template_dispatcher = {
+    'python': python_function_template,
+    'numpy': numpy_function_template,
+    'javascript': javascript_function_template
+    }
 
+language_assignment_statement_dispatcher = defaultdict(lambda: lambda symbols, function_name, input_symbols: ', '.join(symbols) + ' = %s(%s)' % (function_name, ', '.join(input_symbols)) )
+language_assignment_statement_dispatcher['javascript'] = javascript_assigner
 language_return_statement_dispatcher = defaultdict(lambda: lambda expressions: 'return ' + ', '.join(expressions))
+language_return_statement_dispatcher['javascript'] = lambda expressions: 'return [' + ', '.join(expressions) + ']'
 
 def trim_code_precursors(assignments, outputs, inputs, all_variables):
     reverse_new_assignments = []
@@ -270,11 +305,49 @@ def assignment_pairs_and_outputs_to_code(pairs_and_outputs, language, function_n
     return_statement = returner(map(printer().doprint, outputs))
     return template.render(function_name=function_name, input_names=map(lambda x: x.name, inputs_), 
                            assignment_code=assignment_statements, return_code=return_statement)
-    
+
 def parts_to_code(parts, language, function_name, all_variables):
-    pairs_and_outputs = assemble_parts_into_assignment_pairs_and_outputs(parts)
-    inputs = [symbol for symbol in parts[0]]
-    return assignment_pairs_and_outputs_to_code(pairs_and_outputs, language, function_name, inputs, all_variables)
+    
+    function_template = language_function_template_dispatcher[language]
+    printer = language_print_dispatcher[language]().doprint
+    assigner = language_assignment_statement_dispatcher[language]
+    returner = language_return_statement_dispatcher[language]
+    template = language_template_dispatcher[language]
+    
+    if not all_variables:
+        parts = trim_parts(parts)
+    
+    first_inputs, expressions, target = parts
+    inputs = first_inputs
+    index = 0
+    functions = []
+    previous = None
+    while True:
+        if previous is None:
+            body_code = ''
+        else:
+            body_code = assigner(*previous)
+        if target is None:
+            name = function_name
+        else:
+            name = '_' + function_name + '_' + str(index)
+            index += 1
+            
+        return_code = returner(map(printer, expressions))
+        function = function_template.render(function_name=name, input_names=map(lambda x: x.name, first_inputs), 
+                                            body_code=body_code, return_code=return_code)
+        functions.append(function)
+        if target is not None:
+            target_inputs, _, _ = target
+            previous = (map(lambda x: x.name, target_inputs), name, map(lambda x: x.name, first_inputs))
+            inputs, expressions, target = target
+        else:
+            break
+    result = template.render(functions = functions)
+    return result
+#     pairs_and_outputs = assemble_parts_into_assignment_pairs_and_outputs(parts)
+#     inputs = [symbol for symbol in parts[0]]
+#     return assignment_pairs_and_outputs_to_code(pairs_and_outputs, language, function_name, inputs, all_variables)
 
 model_to_code_method_dispatch = {'predict': sym_predict_parts,
                                  'transform': sym_transform_parts}

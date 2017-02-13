@@ -29,7 +29,6 @@ def test_sympy_export():
     model = Earth(allow_missing=True, max_terms=10) >> Earth(allow_missing=True, max_terms=10) >> ProbaPredictingEstimator(ThresholdClassifier(LogisticRegression()))
     model.fit(X, y)
     
-    print model_to_code(model, 'numpy', 'predict', 'test_model')
     numpy_test_module = exec_module('numpy_test_module', model_to_code(model, 'numpy', 'predict', 'test_model'))
     y_pred = numpy_test_module.test_model(col3=X['col3'], col8=X['col8'])
     assert_array_almost_equal(np.ravel(y_pred), np.ravel(model.predict(X)))
@@ -38,7 +37,8 @@ def test_sympy_export():
     y_pred = [python_test_module.test_model(col3=row['col3'], col8=row['col8']) for i, row in X.iterrows()]
     assert_array_almost_equal(np.ravel(y_pred), np.ravel(model.predict(X)))
     
-    js = execjs.get()
+    js = execjs.get(execjs.runtime_names.Node)
+    print model_to_code(model, 'javascript', 'predict', 'test_model')
     context = js.compile(model_to_code(model, 'javascript', 'predict', 'test_model'))
     y_pred = [context.eval('test_model(col3=%s, col8=%s)' % (str(row['col3']) if not np.isnan(row['col3']) else 'NaN', 
                                                              str(row['col8']) if not np.isnan(row['col8']) else 'NaN')) 

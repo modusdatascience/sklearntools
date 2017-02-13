@@ -220,6 +220,7 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
                 data['X'] = safe_call(stage.transform, self._transform_args(data))
     
     def sym_transform_parts(self, target=None):
+        print 'sym_transform_parts', self
         parts = target
         for stage in reversed(self.intermediate_stages_):
             parts = sym_transform_parts(stage, target=parts)
@@ -230,6 +231,7 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
 #         return parts
     
     def sym_predict_parts(self):
+        print 'sym_predict_parts', self
         return sym_transform_parts(self, target=(syms(self.final_stage_), [sym_predict(self.final_stage_)], None))
         
     def _sym_update(self):
