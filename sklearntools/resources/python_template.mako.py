@@ -18,4 +18,7 @@ def negate(val):
         return 1.
 
 def ${function_name}(${', '.join(input_names)}):
-    return ${function_code}
+%for line in assignment_code.splitlines():
+    ${line}
+%endfor
+    ${return_code}

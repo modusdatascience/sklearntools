@@ -15,5 +15,8 @@ function nanprotect(val) {
 };
 
 function ${function_name}(${', '.join(input_names)}) {
-	return ${function_code};
+%for line in assignment_code.splitlines():
+    ${line};
+%endfor
+    ${return_code};
 };

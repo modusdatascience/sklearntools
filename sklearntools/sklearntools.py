@@ -9,7 +9,7 @@ from sklearn.utils.metaestimators import if_delegate_has_method as sklearn_if_de
 from six import with_metaclass
 from functools import update_wrapper
 from inspect import getargspec
-from sym import syms, sym_update, sym_predict
+from sym import syms, sym_update, sym_predict, sym_transform_parts, sym_predict_parts
 import pandas
 from sympy.functions.elementary.miscellaneous import Max, Min
 from sympy.core.numbers import RealNumber
@@ -219,6 +219,19 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
             except AttributeError:
                 data['X'] = safe_call(stage.transform, self._transform_args(data))
     
+    def sym_transform_parts(self, target=None):
+        parts = target
+        for stage in reversed(self.intermediate_stages_):
+            parts = sym_transform_parts(stage, target=parts)
+        return parts
+#         parts = sym_transform_parts(self.intermediate_stages_[0])
+#         for stage in reversed(self.intermediate_stages_):
+#             parts = (syms(stage), sym_transform(stage), parts)
+#         return parts
+    
+    def sym_predict_parts(self):
+        return sym_transform_parts(self, target=(syms(self.final_stage_), [sym_predict(self.final_stage_)], None))
+        
     def _sym_update(self):
         expressions = None
         for stage in self.intermediate_stages_:
