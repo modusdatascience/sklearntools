@@ -16,6 +16,7 @@ from sympy.core.numbers import RealNumber
 from decorator import decorator
 from itertools import chain
 from sym import sym_transform
+from sympy.core.symbol import Symbol
 # 
 # def if_delegate_has_method(*args, **kwargs):
 #     return decorator(sklearn_if_delegate_has_method(*args, **kwargs))
@@ -91,6 +92,15 @@ def safe_assign_subset(arr, idx, value):
         except:
             arr.flat[idx] = value
     
+def safe_column_names(arr):
+    if hasattr(arr, 'columns'):
+        return list(arr.columns)
+    elif len(arr.shape) == 2:
+        return map(lambda i: 'x%d'%i, range(arr.shape[1]))
+    elif len(arr.shape) == 1:
+        return ['x']
+    else:
+        raise ValueError()
 
 def _fit_and_score(estimator, data, scorer, train, test):
     train_data = _subset_data(data, train)
@@ -223,16 +233,20 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
         print 'sym_transform_parts', self
         parts = target
         for stage in reversed(self.intermediate_stages_):
-            parts = sym_transform_parts(stage, target=parts)
+            try:
+                parts = sym_transform_parts(stage, target=parts)
+            except:
+                parts = sym_transform_parts(stage, target=parts)
         return parts
 #         parts = sym_transform_parts(self.intermediate_stages_[0])
 #         for stage in reversed(self.intermediate_stages_):
 #             parts = (syms(stage), sym_transform(stage), parts)
 #         return parts
     
-    def sym_predict_parts(self):
+    def sym_predict_parts(self, target=None):
         print 'sym_predict_parts', self
-        return sym_transform_parts(self, target=(syms(self.final_stage_), [sym_predict(self.final_stage_)], None))
+        parts = sym_predict_parts(self.final_stage_, target)
+        return sym_transform_parts(self, target=parts)
         
     def _sym_update(self):
         expressions = None
@@ -275,19 +289,20 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
         return safe_call(self.final_stage_.transform, data)
     
     def sym_predict(self):
-        try:
-            expressions = self._sym_update()
-            expression = sym_predict(self.final_stage_)
-            symbols =  syms(self.final_stage_)
-            for expr, sym in zip(expressions, symbols):
-                expression = expression.subs(sym, expr)
-        except:
-            expressions = self._sym_update()
-            expression = sym_predict(self.final_stage_)
-            symbols =  syms(self.final_stage_)
-            for expr, sym in zip(expressions, symbols):
-                expression = expression.subs(sym, expr)
+        expressions = self._sym_update()
+        expression = sym_predict(self.final_stage_)
+        symbols =  syms(self.final_stage_)
+        expression = expression.subs(dict(zip(symbols, expressions)))
+#         for expr, sym in zip(expressions, symbols):
+#             expression = expression.subs(sym, expr)
         return expression
+    
+    def sym_transform(self):
+        expressions = self._sym_update()
+        final_expressions = sym_transform(self.final_stage_)
+        symbols =  syms(self.final_stage_)
+        final_expressions = map(lambda x: x.subs(dict(zip(symbols, expressions))), final_expressions)
+        return final_expressions
     
     def syms(self):
         return syms(self.intermediate_stages_[0])
@@ -582,6 +597,20 @@ class BoundedEstimator(DelegatingEstimator):
     def syms(self):
         return syms(self.estimator_)
     
+    def sym_predict_parts(self, target=None):
+        print 'sym_predict_parts', self
+        sym = Symbol('x')
+        expr = sym
+        if self.lower_bound > float('-inf'):
+            expr = Max(expr, RealNumber(self.lower_bound))
+        if self.upper_bound < float('inf'):
+            expr = Min(expr, RealNumber(self.upper_bound))
+        parts = ([sym], [expr], target)
+        return sym_predict_parts(self.estimator_, parts)
+    
+    def sym_transform_parts(self, target=None):
+        return sym_transform_parts(self.estimator_, target)
+    
     def sym_predict(self):
         result = sym_predict(self.estimator_)
         if self.lower_bound > float('-inf'):
@@ -849,8 +878,50 @@ class MultiEstimator(STSimpleEstimator, MetaEstimatorMixin):
             self.estimators_.append(clone(estimator).fit(**args))
         return self
     
+    def sym_transform_parts(self, target=None):
+        print 'sym_transform_parts', self
+        inputs = syms(self)
+        expressions = []
+        for est in self.estimators_:
+#             parts = sym_transform_parts(est, None)
+#             if inputs != parts[0]:
+#                 inpset = set(inputs)
+#                 partset = set(parts[0])
+#                 if inpset < partset:
+#                     inputs = parts[0]
+#                 elif partset < inpset:
+#                     pass
+#                 else:
+#                     raise ValueError('Inputs not compatible in multiestimator')
+                
+            expressions.extend(sym_transform(est))
+        return (inputs, expressions, target)
+    
+    def sym_predict_parts(self, target=None):
+        print 'sym_predict_parts', self
+        inputs = syms(self.estimators_[0])
+        expressions = []
+        for est in self.estimators_:
+            parts = sym_predict_parts(est, None)
+            assert inputs == parts[0]
+            expressions.extend(parts[1])
+        return (inputs, expressions, target)
+        
     def syms(self):
-        return list(set(chain(*map(syms, self.estimators_))))
+        inputs = syms(self.estimators_[0])
+        for est in self.estimators_:
+            new_inputs = syms(est)
+            if inputs != new_inputs:
+                inpset = set(inputs)
+                partset = set(new_inputs)
+                if inpset < partset:
+                    inputs = new_inputs
+                elif partset < inpset:
+                    pass
+                else:
+                    raise ValueError('Inputs not compatible in multiestimator')
+        return inputs
+#         return list(set(chain(*map(syms, self.estimators_))))
     
     def sym_transform(self):
         return list(chain(*map(sym_transform, self.estimators_)))
@@ -858,12 +929,20 @@ class MultiEstimator(STSimpleEstimator, MetaEstimatorMixin):
     def transform(self, X, y=None, sample_weight=None, exposure=None):
         args = self._process_args(X=X, exposure=exposure)
         results = []
+        total_cols = 0
         for estimator in self.estimators_:
             result = estimator.transform(**args)
+            try:
+                total_cols += result.shape[1]
+            except IndexError:
+                total_cols += 1
             if len(result.shape) == 1:
                 result = result[:, None]
             results.append(result)
-        return np.concatenate(results, axis=1)
+            
+        result = np.concatenate(results, axis=1)
+        assert result.shape[1] == total_cols
+        return result
     
     def predict(self, X, exposure=None):
         args = self._process_args(X=X, exposure=exposure)

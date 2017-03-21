@@ -446,7 +446,7 @@ def test_linear_transformation():
     combination = 2*model1 - model2
     
     assert_array_almost_equal(combination.predict(X), 2 * np.ravel(model1.predict(X)) - np.ravel(model2.predict(X)))
-    
+
 if __name__ == '__main__':
     test_cross_validating_estimator()
     test_single_elimination_feature_importance_estimator_cv()

@@ -101,10 +101,16 @@ def mean_pm_std(factor):
     return lambda x: mean(x) + factor * std(x)
  
 def bootstrap(outer_stat, inner_stat, n):
-    def _bootstrap(x):
+    def _bootstrap(*args):
         result = np.zeros(shape=n)
         for i in range(n):
-            result[i] = inner_stat(resample(np.asarray(x)))
+            inner_args = resample(*[np.asarray(arg) for arg in args])
+            if type(inner_args) is not list:
+                inner_args = [inner_args]
+#             
+#             for arg in args:
+#                 inner_args.append(resample(np.asarray(arg)))
+            result[i] = inner_stat(*inner_args)
         return outer_stat(result)
     return _bootstrap
 

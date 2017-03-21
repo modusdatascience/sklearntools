@@ -1,14 +1,20 @@
 from sklearntools import STSimpleEstimator, DelegatingEstimator, non_fit_methods,\
-    standard_methods, _subset, safe_col_select, safe_call
+    standard_methods, _subset, safe_col_select, safe_call, safe_column_names
 from sklearn.base import MetaEstimatorMixin, is_classifier, clone,\
     TransformerMixin
 from sklearn.cross_validation import check_cv
 from sklearn.externals.joblib.parallel import Parallel, delayed
 import numpy as np
 from sklearn.utils.metaestimators import if_delegate_has_method
-from sym import sym_transform, sym_predict, sym_predict_proba, syms, sym_predict_parts
+from sym import sym_transform, sym_predict, sym_predict_proba, syms, sym_predict_parts, \
+    sym_transform_parts
 from sklearntools import safe_assign_subset, _fit_and_predict
 from sympy.core.symbol import Symbol
+from numpy import inf
+from sympy.functions.elementary.exponential import log
+from sympy.functions.elementary.piecewise import Piecewise
+from sympy.core.numbers import RealNumber
+from sympy.functions.elementary.miscellaneous import Max
 
 # def _fit_and_predict(estimator, X, y, train, test, sample_weight=None, exposure=None):
 #     '''
@@ -249,24 +255,48 @@ class PredictorTransformer(DelegatingEstimator):
         print 'sym_transform_parts', self
         return sym_predict_parts(self, target)
     
+    def sym_predict_parts(self, target=None):
+        print 'sym_predict_parts', self
+        return sym_predict_parts(self.estimator_, target)
+    
 class SelectorTransformer(STSimpleEstimator):
     '''
     Just grab some input columns and pass them through.
     '''
     def __init__(self, columns):
         self.columns = columns
+        assert len(self.columns) == len(set(self.columns))
 
     def fit(self, X, y=None, sample_weight=None, exposure=None):
+        if hasattr(X, 'columns'):
+            self.inputs_ = list(X.columns)
+        else:
+            self.inputs_ = ['x_%d' % i for i in range(X.shape[1])]
+        if hasattr(X, 'columns') and type(self.columns) is list:
+            print 'Checking inputs for SelectorTransformer.fit'
+            try:
+                assert set(self.inputs_) >= set(self.columns)
+            except:
+                print self.inputs_
+                print self.columns
+                raise
         return self
     
     def transform(self, X, exposure=None):
         return safe_col_select(X, self.columns)
     
-    def syms(self):
-        return [Symbol(col) for col in self.columns]
+    def sym_transform_parts(self, target=None):
+        return (syms(self), sym_transform(self), target)
     
+    def syms(self):
+        if hasattr(self, 'inputs_'):
+            return [Symbol(col) for col in self.inputs_]
+        else:
+            # TODO: Pickle compatibility with old versions -- remove later
+            return [Symbol(col) for col in self.columns]
+        
     def sym_transform(self):
-        return self.syms()
+        return [Symbol(col) for col in self.columns]
     
 def no_cv(X, y):
     yield np.ones(X.shape[0]).astype(bool), np.ones(X.shape[0]).astype(bool)
@@ -301,8 +331,12 @@ class CalibratedEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
     
     def sym_predict_parts(self, target=None):
         print 'sym_predict_parts', self
-        parts = sym_predict_parts(self.estimator_, target)
-        return sym_predict_parts(self.calibrator_, parts)
+        parts = sym_predict_parts(self.calibrator_, target)
+        return sym_predict_parts(self.estimator_, parts)
+    
+    def sym_transform_parts(self, target=None):
+        print 'sym_transform_parts', self
+        return sym_transform_parts(self.estimator_, target)
     
     def sym_transform(self):
         return sym_transform(self.estimator_)
@@ -418,15 +452,56 @@ class IdentityTransformer(STSimpleEstimator, TransformerMixin):
         return X
 
 class LogTransformer(STSimpleEstimator, TransformerMixin):
-    def __init__(self, offset = 1.):
+    def __init__(self, offset=1., guard=0.):
         self.offset = offset
+        self.guard = guard
      
     def fit(self, X, y=None, sample_weight=None):
+        self.inputs_ = safe_column_names(X)
         return self
      
     def transform(self, X, y=None):
-        return np.log(self.offset + X)
+        return np.log(self.offset + np.maximum(X,self.guard))
+    
+    def syms(self):
+        return map(Symbol, self.inputs_)
+    
+    def sym_transform(self):
+        return map(lambda x: log(Max(RealNumber(self.guard) + RealNumber(self.offset), x + RealNumber(self.offset))), self.syms())
 
+class IntervalTransformer(STSimpleEstimator, TransformerMixin):
+    def __init__(self, lower=-inf, upper=inf, lower_closed=False, upper_closed=False):
+        self.lower = lower
+        self.upper = upper
+        self.lower_closed = lower_closed
+        self.upper_closed = upper_closed
+        
+    def fit(self, X, y=None, sample_weight=None):
+        self.inputs_ = safe_column_names(X)
+        return self
+    
+    def transform(self, X, y=None):
+        result = np.ones_like(X)
+        if self.lower_closed:
+            result[X < self.lower] = 0.
+        else:
+            result[X <= self.lower] = 0.
+        if self.upper_closed:
+            result[X > self.upper] = 0.
+        else:
+            result[X >= self.upper] = 0.
+        return result
+    
+    def syms(self):
+        return map(Symbol, self.inputs_)
+    
+    def sym_transform(self):
+        def indicator(arg):
+            return Piecewise((RealNumber(0), arg < self.lower if self.lower_closed else arg <= self.lower),
+                             (RealNumber(0), arg > self.upper if self.upper_closed else arg >= self.upper),
+                             (RealNumber(1), True))
+        return map(indicator, self.syms())
+    
 def index(table, idx0, idx1):
     if hasattr(table, 'loc'):
         return table.loc[idx0, idx1]
@@ -490,6 +565,12 @@ class ResponseTransformingEstimator(DelegatingEstimator):
                                              'predict_log_proba', 'decision_function'])
     def syms(self):
         return syms(self.estimator_)
+    
+    def sym_predict_parts(self, target=None):
+        return sym_predict_parts(self.estimator_, target)
+    
+    def sym_transform_parts(self, target=None):
+        return sym_transform_parts(self.estimator_, target)
     
     def sym_predict(self):
         return sym_predict(self.estimator_)

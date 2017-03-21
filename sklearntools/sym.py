@@ -27,6 +27,8 @@ def call_method_or_dispatch(method_name, dispatcher):
                     exporter = dispatcher[klass]
                     return exporter(estimator, *args, **kwargs)
             raise
+        except:
+            raise
     _call_method_or_dispatch.__name__ = method_name
     return _call_method_or_dispatch
 
@@ -86,28 +88,46 @@ sym_predict = call_method_or_dispatch('sym_predict', sym_predict_dispatcher)
 sym_predict_proba_dispatcher = {LogisticRegression: sym_predict_logist_regression}
 sym_predict_proba = call_method_or_dispatch('sym_predict_proba', sym_predict_proba_dispatcher)
 
-def sym_predict_parts_base(obj):
-    return (syms(obj), [sym_predict(obj)], None)
+def assert_parts_are_composable(parts):
+    inputs, expressions, target = parts
+    try:
+        assert set(inputs) >= set(chain(*map(lambda x:x.free_symbols, expressions)))
+    except:
+        assert set(inputs) >= set(chain(*map(lambda x:x.free_symbols, expressions)))
+    if target is not None:
+        target_inputs, _, _ = target
+        try:
+            assert len(target_inputs) == len(expressions) 
+            assert_parts_are_composable(target)
+        except:
+            assert len(target_inputs) == len(expressions) 
+            assert_parts_are_composable(target)
+def double_check(fn):
+    def _double_check(*args, **kwargs):
+        result = fn(*args, **kwargs)
+        try:
+            assert_parts_are_composable(result)
+        except:
+            raise
+        return result
+    return _double_check
+
+def sym_predict_parts_base(obj, target=None):
+    print 'sym_predict_parts_base', obj
+    return (syms(obj), [sym_predict(obj)], target)
 
 sym_predict_parts_dispatcher = {}
-sym_predict_parts = fallback(call_method_or_dispatch('sym_predict_parts', sym_predict_parts_dispatcher), sym_predict_parts_base)
+sym_predict_parts = double_check(fallback(call_method_or_dispatch('sym_predict_parts', sym_predict_parts_dispatcher), sym_predict_parts_base))
 
 sym_transform_dispatcher = {Earth: export_sympy_term_expressions}
 sym_transform = call_method_or_dispatch('sym_transform', sym_transform_dispatcher)
 
 def sym_transform_parts_base(obj, target=None):
+    print 'sym_transform_parts_base', obj
     return (syms(obj), sym_transform(obj), target)
 
 sym_transform_parts_dispatcher = {}
-sym_transform_parts = fallback(call_method_or_dispatch('sym_transform_parts', sym_transform_parts_dispatcher), sym_transform_parts_base)
-
-def assert_parts_are_composable(parts):
-    inputs, expressions, target = parts
-    assert set(inputs) >= set(chain(*map(lambda x:x.free_symbols, expressions)))
-    if target is not None:
-        target_inputs, _, _ = target
-        assert len(target_inputs) == len(expressions) 
-        assert_parts_are_composable(target)
+sym_transform_parts = double_check(fallback(call_method_or_dispatch('sym_transform_parts', sym_transform_parts_dispatcher), sym_transform_parts_base))
 
 def assemble_parts_into_expressions(parts):
     inputs, expressions, target = parts
@@ -176,12 +196,12 @@ with open(javascript_function_template_filename) as infile:
 def javascript_assigner(symbols, function_name, input_symbols):
     return 'var [%s] = %s(%s)' % (', '.join(symbols), function_name, ','.join(input_symbols))
     
-def javascript_str(function_name, estimator, method=sym_predict, all_variables=False):
-    expression = method(estimator)
-    used_names = expression.free_symbols
-    input_names = [sym.name for sym in syms(estimator) if sym in used_names or all_variables]
-    return javascript_template.render(function_name=function_name, input_names=input_names,
-                                      function_code=STJavaScriptPrinter().doprint(expression))
+# def javascript_str(function_name, estimator, method=sym_predict, all_variables=False):
+#     expression = method(estimator)
+#     used_names = expression.free_symbols
+#     input_names = [sym.name for sym in syms(estimator) if sym in used_names or all_variables]
+#     return javascript_template.render(function_name=function_name, input_names=input_names,
+#                                       function_code=STJavaScriptPrinter().doprint(expression))
 
 class STNumpyPrinter(NumPyPrinter):
     def _print_Max(self, expr):
@@ -204,16 +224,16 @@ numpy_function_template_filename = os.path.join(resources, 'numpy_function_templ
 with open(numpy_function_template_filename) as infile:
     numpy_function_template = Template(infile.read())
 
-def numpy_str(function_name, estimator, method=sym_predict, all_variables=False, pep8=False):
-    expression = method(estimator)
-    used_names = expression.free_symbols
-    input_names = [sym.name for sym in syms(estimator) if sym in used_names or all_variables]
-    function_code = STNumpyPrinter().doprint(expression)
-    result = numpy_template.render(function_name=function_name, input_names=input_names,
-                                      function_code=function_code)
-    if pep8:
-        result =  autopep8.fix_code(result, options={'aggressive': 1})
-    return result
+# def numpy_str(function_name, estimator, method=sym_predict, all_variables=False, pep8=False):
+#     expression = method(estimator)
+#     used_names = expression.free_symbols
+#     input_names = [sym.name for sym in syms(estimator) if sym in used_names or all_variables]
+#     function_code = STNumpyPrinter().doprint(expression)
+#     result = numpy_template.render(function_name=function_name, input_names=input_names,
+#                                       function_code=function_code)
+#     if pep8:
+#         result =  autopep8.fix_code(result, options={'aggressive': 1})
+#     return result
 
 class STPythonPrinter(PythonPrinter):
     def _print_Float(self, expr):
@@ -241,12 +261,12 @@ python_function_template_filename = os.path.join(resources, 'python_function_tem
 with open(python_function_template_filename) as infile:
     python_function_template = Template(infile.read())
 
-def python_str(function_name, estimator, method=sym_predict, all_variables=False):
-    expression = method(estimator)
-    used_names = expression.free_symbols
-    input_names = [sym.name for sym in syms(estimator) if sym in used_names or all_variables]
-    return autopep8.fix_code(python_template.render(function_name=function_name, input_names=input_names,
-                                      function_code=STPythonPrinter().doprint(expression)), options={'aggressive': 1})
+# def python_str(function_name, estimator, method=sym_predict, all_variables=False):
+#     expression = method(estimator)
+#     used_names = expression.free_symbols
+#     input_names = [sym.name for sym in syms(estimator) if sym in used_names or all_variables]
+#     return autopep8.fix_code(python_template.render(function_name=function_name, input_names=input_names,
+#                                       function_code=STPythonPrinter().doprint(expression)), options={'aggressive': 1})
 
 language_print_dispatcher = {
     'python': STPythonPrinter,
@@ -354,6 +374,7 @@ model_to_code_method_dispatch = {'predict': sym_predict_parts,
 
 def model_to_code(model, language, method, function_name, all_variables=False):
     parts = model_to_code_method_dispatch[method](model)
+    assert_parts_are_composable(parts)
     result = parts_to_code(parts, language, function_name, all_variables)
     return result
     
