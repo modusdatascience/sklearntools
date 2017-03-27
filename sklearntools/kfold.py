@@ -24,11 +24,9 @@ class CrossValidatingEstimator(BaseDelegatingEstimator):
         return sym_predict(self.estimator_)
     
     def sym_predict_parts(self, target=None):
-        print 'sym_predict_parts', self
         return sym_predict_parts(self.estimator_, target)
     
     def sym_transform_parts(self, target=None):
-        print 'sym_transform_parts', self
         return sym_transform_parts(self.estimator_, target)
     
     def syms(self):

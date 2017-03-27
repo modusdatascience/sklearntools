@@ -24,7 +24,6 @@ from sympy.core.symbol import Symbol
 # @decorator
 def if_delegate_has_method(*args, **kwargs):
     return lambda x: x
-#     print 'hello', fn
 #     return fn(*args, **kwargs)
 
 def safe_call(fn, args):
@@ -230,7 +229,6 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
                 data['X'] = safe_call(stage.transform, self._transform_args(data))
     
     def sym_transform_parts(self, target=None):
-        print 'sym_transform_parts', self
         parts = target
         for stage in reversed(self.intermediate_stages_):
             try:
@@ -244,7 +242,6 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
 #         return parts
     
     def sym_predict_parts(self, target=None):
-        print 'sym_predict_parts', self
         parts = sym_predict_parts(self.final_stage_, target)
         return sym_transform_parts(self, target=parts)
         
@@ -598,7 +595,6 @@ class BoundedEstimator(DelegatingEstimator):
         return syms(self.estimator_)
     
     def sym_predict_parts(self, target=None):
-        print 'sym_predict_parts', self
         sym = Symbol('x')
         expr = sym
         if self.lower_bound > float('-inf'):
@@ -879,7 +875,6 @@ class MultiEstimator(STSimpleEstimator, MetaEstimatorMixin):
         return self
     
     def sym_transform_parts(self, target=None):
-        print 'sym_transform_parts', self
         inputs = syms(self)
         expressions = []
         for est in self.estimators_:
@@ -898,7 +893,6 @@ class MultiEstimator(STSimpleEstimator, MetaEstimatorMixin):
         return (inputs, expressions, target)
     
     def sym_predict_parts(self, target=None):
-        print 'sym_predict_parts', self
         inputs = syms(self.estimators_[0])
         expressions = []
         for est in self.estimators_:

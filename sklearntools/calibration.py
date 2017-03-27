@@ -252,11 +252,9 @@ class PredictorTransformer(DelegatingEstimator):
         return self.estimator_.sym_predict()
     
     def sym_transform_parts(self, target=None):
-        print 'sym_transform_parts', self
         return sym_predict_parts(self, target)
     
     def sym_predict_parts(self, target=None):
-        print 'sym_predict_parts', self
         return sym_predict_parts(self.estimator_, target)
     
 class SelectorTransformer(STSimpleEstimator):
@@ -273,12 +271,9 @@ class SelectorTransformer(STSimpleEstimator):
         else:
             self.inputs_ = ['x_%d' % i for i in range(X.shape[1])]
         if hasattr(X, 'columns') and type(self.columns) is list:
-            print 'Checking inputs for SelectorTransformer.fit'
             try:
                 assert set(self.inputs_) >= set(self.columns)
             except:
-                print self.inputs_
-                print self.columns
                 raise
         return self
     
@@ -330,12 +325,10 @@ class CalibratedEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
         return cal.subs(cal_vars[0], est)
     
     def sym_predict_parts(self, target=None):
-        print 'sym_predict_parts', self
         parts = sym_predict_parts(self.calibrator_, target)
         return sym_predict_parts(self.estimator_, parts)
     
     def sym_transform_parts(self, target=None):
-        print 'sym_transform_parts', self
         return sym_transform_parts(self.estimator_, target)
     
     def sym_transform(self):
@@ -483,13 +476,13 @@ class IntervalTransformer(STSimpleEstimator, TransformerMixin):
     def transform(self, X, y=None):
         result = np.ones_like(X)
         if self.lower_closed:
-            result[X < self.lower] = 0.
+            result[np.asarray(X < self.lower)] = 0.
         else:
-            result[X <= self.lower] = 0.
+            result[np.asarray(X <= self.lower)] = 0.
         if self.upper_closed:
-            result[X > self.upper] = 0.
+            result[np.asarray(X > self.upper)] = 0.
         else:
-            result[X >= self.upper] = 0.
+            result[np.asarray(X >= self.upper)] = 0.
         return result
     
     def syms(self):
