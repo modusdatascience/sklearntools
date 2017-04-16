@@ -113,7 +113,6 @@ def double_check(fn):
     return _double_check
 
 def sym_predict_parts_base(obj, target=None):
-    print 'sym_predict_parts_base', obj
     return (syms(obj), [sym_predict(obj)], target)
 
 sym_predict_parts_dispatcher = {}
@@ -123,7 +122,6 @@ sym_transform_dispatcher = {Earth: export_sympy_term_expressions}
 sym_transform = call_method_or_dispatch('sym_transform', sym_transform_dispatcher)
 
 def sym_transform_parts_base(obj, target=None):
-    print 'sym_transform_parts_base', obj
     return (syms(obj), sym_transform(obj), target)
 
 sym_transform_parts_dispatcher = {}
@@ -309,22 +307,22 @@ def trim_code_precursors(assignments, outputs, inputs, all_variables):
             
             
 
-def assignment_pairs_and_outputs_to_code(pairs_and_outputs, language, function_name, inputs, all_variables):
-    assignments, outputs = pairs_and_outputs
-    assignment_statements = ''
-    assignments, inputs_ = trim_code_precursors(assignments, outputs, inputs, all_variables)
-    
-    printer = language_print_dispatcher[language]
-    assigner = language_assignment_statement_dispatcher[language]
-    returner = language_return_statement_dispatcher[language]
-    template = language_template_dispatcher[language]
-    for symbol, expression in assignments:
-        
-        assignment_statements += assigner(symbol.name, printer().doprint(expression)) + '\n'
-    
-    return_statement = returner(map(printer().doprint, outputs))
-    return template.render(function_name=function_name, input_names=map(lambda x: x.name, inputs_), 
-                           assignment_code=assignment_statements, return_code=return_statement)
+# def assignment_pairs_and_outputs_to_code(pairs_and_outputs, language, function_name, inputs, all_variables):
+#     assignments, outputs = pairs_and_outputs
+#     assignment_statements = ''
+#     assignments, inputs_ = trim_code_precursors(assignments, outputs, inputs, all_variables)
+#     
+#     printer = language_print_dispatcher[language]
+#     assigner = language_assignment_statement_dispatcher[language]
+#     returner = language_return_statement_dispatcher[language]
+#     template = language_template_dispatcher[language]
+#     for symbol, expression in assignments:
+#         
+#         assignment_statements += assigner(symbol.name, printer().doprint(expression)) + '\n'
+#     
+#     return_statement = returner(map(printer().doprint, outputs))
+#     return template.render(function_name=function_name, input_names=map(lambda x: x.name, inputs_), 
+#                            assignment_code=assignment_statements, return_code=return_statement)
 
 def parts_to_code(parts, language, function_name, all_variables):
     
