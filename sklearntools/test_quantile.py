@@ -26,7 +26,7 @@ def sim_quantiles(taus, quantiles):
 
 @if_cvxpy
 def test_quantile_regression():
-    from sklearntools.quantile import QuantileRegressor
+    from .quantile import QuantileRegressor
     np.random.seed(1)
     X = np.random.uniform(0,1,size=(10000,2))
     b = np.array([[0,0],[1,1],[2,2],[4,4],[6,6]]).transpose()
