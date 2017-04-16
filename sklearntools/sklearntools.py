@@ -5,7 +5,6 @@ Created on Feb 11, 2016
 '''
 from sklearn.base import BaseEstimator, clone, MetaEstimatorMixin
 import numpy as np
-from sklearn.utils.metaestimators import if_delegate_has_method as sklearn_if_delegate_has_method
 from six import with_metaclass
 from functools import update_wrapper
 from inspect import getargspec
@@ -13,10 +12,10 @@ from sym import syms, sym_update, sym_predict, sym_transform_parts, sym_predict_
 import pandas
 from sympy.functions.elementary.miscellaneous import Max, Min
 from sympy.core.numbers import RealNumber
-from decorator import decorator
 from itertools import chain
 from sym import sym_transform
 from sympy.core.symbol import Symbol
+from . import __version__
 # 
 # def if_delegate_has_method(*args, **kwargs):
 #     return decorator(sklearn_if_delegate_has_method(*args, **kwargs))
@@ -116,7 +115,7 @@ def _fit_and_predict(estimator, data, train, test):
     return estimator_, prediction, test
 
 class SklearnTool(object):
-    pass
+    _skversion = __version__
 # 
 # def name_estimator(estimator):
 #     if hasattr(estimator, 'name'):
