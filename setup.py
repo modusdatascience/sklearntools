@@ -1,7 +1,9 @@
 from distutils.core import setup
+import versioneer
 
 setup(name='sklearntools',
-      version='0.1',
+      version=versioneer.get_version(),
+      cmdclass=versioneer.get_cmdclass(),
       description='Tools for sklearn models',
       author='Jason Rudy',
       author_email='jcrudy@gmail.com',
