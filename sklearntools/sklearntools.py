@@ -115,7 +115,7 @@ def _fit_and_predict(estimator, data, train, test):
     return estimator_, prediction, test
 
 class SklearnTool(object):
-    _skversion = __version__
+    _version = __version__
 # 
 # def name_estimator(estimator):
 #     if hasattr(estimator, 'name'):
