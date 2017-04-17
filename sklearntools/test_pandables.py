@@ -1,4 +1,4 @@
-from .pandabless import InputFixingTransformer
+from .pandables import InputFixingTransformer
 from sklearn.linear_model.base import LinearRegression
 import pandas as pd
 import numpy as np
