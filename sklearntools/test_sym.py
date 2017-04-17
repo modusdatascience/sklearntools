@@ -41,7 +41,7 @@ def test_sympy_export():
     model = CrossValidatingEstimator(estimator=model)
     model.fit(X, y)
     
-    print model_to_code(model, 'numpy', 'predict', 'test_model')
+#     print model_to_code(model, 'numpy', 'predict', 'test_model')
     numpy_test_module = exec_module('numpy_test_module', model_to_code(model, 'numpy', 'predict', 'test_model'))
     y_pred = numpy_test_module.test_model(**X)
     assert_array_almost_equal(np.ravel(y_pred), np.ravel(model.predict(X)))
@@ -54,7 +54,7 @@ def test_sympy_export():
     return
     
     js = execjs.get(execjs.runtime_names.PyV8)
-    print model_to_code(model, 'javascript', 'predict', 'test_model')
+#     print model_to_code(model, 'javascript', 'predict', 'test_model')
     context = js.compile(model_to_code(model, 'javascript', 'predict', 'test_model'))
     y_pred = [context.eval('test_model(col3=%s, col8=%s)' % (str(row['col3']) if not np.isnan(row['col3']) else 'NaN', 
                                                              str(row['col8']) if not np.isnan(row['col8']) else 'NaN')) 
@@ -76,11 +76,12 @@ def test_more_sym_stuff():
     X = pandas.DataFrame(X, columns=cols)
     
     model = (SelectorTransformer(['x1']) >> LogTransformer()) & (IntervalTransformer(lower=0., lower_closed=False) & SelectorTransformer(cols))
+    model >>= (Earth() & Earth())
     model >>= Earth()
     model = PredictorTransformer(model)
     model.fit(X, y)
     
-    print sym_predict(model)
+#     print sym_predict(model)
     numpy_test_module = exec_module('numpy_test_module', model_to_code(model, 'numpy', 'predict', 'test_model'))
     y_pred = numpy_test_module.test_model(**X)
     assert_array_almost_equal(np.ravel(y_pred), np.ravel(model.predict(X)))
