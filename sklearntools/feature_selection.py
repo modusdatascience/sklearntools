@@ -11,7 +11,7 @@ from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.utils import safe_mask
 
 def weighted_average_score_combine(scores):
-    scores_arr = np.array(scores[:2])
+    scores_arr = np.array([tup[:2] for tup in scores])
     return np.average(scores_arr[:,0], weights=scores_arr[:,1])
     
 def check_score_combiner(estimator, score_combiner):

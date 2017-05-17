@@ -186,7 +186,7 @@ def test_predictor_transformer_calibration():
     assert np.max(model.final_stage_.estimator_.coef_ - 1.) < .1
     
 def test_pipeline():
-    np.random.seed(3)
+    np.random.seed(1)
     m = 10000
     n = 10
     
