@@ -1,5 +1,5 @@
 from sklearntools import STSimpleEstimator, BaseDelegatingEstimator,\
-    _fit_and_score, standard_methods, non_fit_methods
+    _fit_and_score, standard_methods, non_fit_methods, safer_call
 from sklearn.base import MetaEstimatorMixin, is_classifier, clone
 from itertools import product
 from sklearn.cross_validation import check_cv
@@ -12,16 +12,11 @@ from calibration import no_cv
 def candidate_grid(estimator, param_grid):
     pass
 
-class ModelSelectorCV(BaseDelegatingEstimator):
-    def __init__(self, candidates, scoring, score_combiner=None, cv=2, n_jobs=1, verbose=0, 
-                 pre_dispatch='2*n_jobs'):
+
+class ModelSelector(BaseDelegatingEstimator):
+    def __init__(self, candidates, scoring=None):
         self._process_candidates(candidates)
         self.scoring = scoring
-        self.score_combiner = score_combiner
-        self.n_jobs = n_jobs
-        self.pre_dispatch = pre_dispatch
-        self.cv = cv
-        self.verbose = verbose
     
     def _process_candidates(self, candidates):
         '''
@@ -65,45 +60,55 @@ class ModelSelectorCV(BaseDelegatingEstimator):
         return self.estimator._estimator_type
     
     def fit(self, X, y=None, sample_weight=None, exposure=None):
-        # For later
-        parallel = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
-                        pre_dispatch=self.pre_dispatch)
-        
         # Extract arguments
         fit_args = self._process_args(X=X, y=y, sample_weight=sample_weight,
                                       exposure=exposure)
+        predict_args = fit_args.copy()
+        if 'X' in predict_args:
+            del predict_args['X']
+        if 'sample_weight' in predict_args:
+            del predict_args['sample_weight']
         
         # Find the best scoring candidate
         best_score = float('-inf')
         best_candidate = None
-        for candidate in self.candidates:
-            # Sort out the parameters for this candidate
-            if self.cv == 1:
-                cv = no_cv(X=X, y=y)
-            else:
-                if hasattr(self.cv, 'split'):
-                    cv = self.cv.split(X, y)
-                else:
-                    cv = check_cv(self.cv, X=X, y=y, classifier=is_classifier(candidate))
-                    
+        self.candidates_ = []
+        self.candidate_scores_ = []
+        for i, candidate in enumerate(self.candidates):
             scorer = check_scoring(candidate, scoring=self.scoring)
-            combiner = check_score_combiner(candidate, self.score_combiner)
             
             # Do the actual fitting and scoring
-            scores = parallel(delayed(_fit_and_score)(clone(candidate), fit_args, scorer,
-                                      train, test)
-                              for train, test in cv)
-            score = combiner(scores)
+            candidate_ = clone(candidate).fit(**fit_args)
+            if self.scoring is None and hasattr(candidate_, 'score_'):
+                score = candidate_.score_
+            else:
+                score = safer_call(scorer, candidate_, **fit_args)
+                    
+#             score, _, candidate_ = _fit_and_score(clone(candidate), fit_args, scorer, slice(None), slice(None))
+            
+            # Store the results
+            self.candidate_scores_.append(score)
+            self.candidates_.append(candidate_)
+            
+            # If it's the best so far, keep it
             if score > best_score:
                 best_score = score
-                best_candidate = candidate
+                best_candidate = candidate_
+                best_candidate_index = i
         
-        # Fit the best candidate
-        self.best_estimator = best_candidate
-        self.best_estimator_ = clone(best_candidate).fit(**fit_args)
+        self.best_estimator_ = best_candidate
         self.best_score_ = best_score
+        self.best_candidate_index_ = best_candidate_index
+        self.best_estimator = best_candidate
         self._create_delegates('best_estimator', non_fit_methods)
         del self.best_estimator
+        # Fit the best candidate
+        
+#         self.best_estimator = best_candidate
+#         self.best_estimator_ = clone(best_candidate).fit(**fit_args)
+#         self.best_score_ = best_score
+#         self._create_delegates('best_estimator', non_fit_methods)
+#         del self.best_estimator
         return self
             
             

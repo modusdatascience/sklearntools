@@ -21,14 +21,15 @@ import statsmodels.api as sm
 # from pyearth.earth import Earth
 import warnings
 import pandas
-from sklearntools.model_selection import ModelSelectorCV
-from sklearntools.scoring import log_loss_scorer
+from sklearntools.model_selection import ModelSelector
+from sklearntools.scoring import log_loss_scorer, log_loss_metric
 from sklearn.ensemble.forest import RandomForestRegressor
 from numpy.ma.testutils import assert_array_almost_equal
 from sklearntools.earth import Earth
 from sklearntools.kfold import CrossValidatingEstimator
 from sklearn.metrics.regression import r2_score
 from sklearn.model_selection import KFold
+from sklearn.metrics.classification import log_loss
 warnings.simplefilter("error")
     
 def test_single_elimination_feature_importance_estimator_cv():
@@ -362,7 +363,7 @@ def test_column_subset_transformer():
     lin.predict(X_.loc[:, x_cols_])
     lin.score(X_)
 
-def test_model_selector_cv():
+def test_model_selector():
     np.random.seed(1)
     
     m = 10000
@@ -381,13 +382,13 @@ def test_model_selector_cv():
     basic_model = CalibratedEstimatorCV(GLM(sm.families.Gaussian(sm.families.links.log), add_constant=False), 
                                   ProbaPredictingEstimator(ThresholdClassifier(HazardToRiskEstimator(LogisticRegression()))))
 
-    model1 = ColumnSubsetTransformer(x_cols=best_subset) >> basic_model
-    model2 = ColumnSubsetTransformer(x_cols=worst_subset) >> basic_model
+    model1 = CrossValidatingEstimator(ColumnSubsetTransformer(x_cols=best_subset) >> basic_model, metric=log_loss_metric)
+    model2 = CrossValidatingEstimator(ColumnSubsetTransformer(x_cols=worst_subset) >> basic_model, metric=log_loss_metric)
     
-    model = ModelSelectorCV([model1, model2], scoring=log_loss_scorer)
+    model = ModelSelector([model1, model2])
     
     model.fit(X, rate, exposure=exposure)
-    np.testing.assert_array_equal(model.best_estimator_.intermediate_stages_[0].x_cols, best_subset)
+    np.testing.assert_array_equal(model.best_estimator_.estimator_.intermediate_stages_[0].x_cols, best_subset)
 
 def test_cross_validating_estimator():
     np.random.seed(1)
@@ -462,7 +463,7 @@ if __name__ == '__main__':
     test_moving_average_smoothing_estimator()
     test_staged_estimator()
     test_column_subset_transformer()
-    test_model_selector_cv()
+    test_model_selector()
     test_non_null_row_subset_fitter()
     test_linear_transformation()
     print 'Success!'

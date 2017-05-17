@@ -9,6 +9,11 @@ def log_loss_scorer(clf, X, y, **kwargs):
     
     return log_loss(**args)
 
+def log_loss_metric(y, y_hat, **kwargs):
+    args = {'y_true':y>0, 'y_pred':y_hat}
+    if 'sample_weight' in kwargs:
+        args['sample_weight'] = kwargs['sample_weight']
+    return log_loss(**args)
 
 
 

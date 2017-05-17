@@ -105,7 +105,7 @@ def _fit_and_score(estimator, data, scorer, train, test):
     estimator_ = clone(estimator).fit(**train_data)
     test_data = _subset_data(data, test)
     score = safer_call(scorer, estimator_, **test_data)
-    return (score, np.sum(test))
+    return (score, np.sum(test), estimator_)
 
 def _fit_and_predict(estimator, data, train, test):
     train_data = _subset_data(data, train)

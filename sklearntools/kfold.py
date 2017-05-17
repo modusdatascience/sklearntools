@@ -2,14 +2,15 @@ from sklearn.externals.joblib.parallel import Parallel, delayed
 from calibration import no_cv
 from sklearn.cross_validation import check_cv
 from sklearn.base import is_classifier, clone
-from sklearntools import _fit_and_predict, non_fit_methods, BaseDelegatingEstimator, safe_assign_subset
+from sklearntools import _fit_and_predict, non_fit_methods, BaseDelegatingEstimator, safe_assign_subset, safer_call
 import numpy as np
 from sym import sym_predict, syms, sym_predict_parts, sym_transform_parts
 
 class CrossValidatingEstimator(BaseDelegatingEstimator):
-    def __init__(self, estimator, cv=2, n_jobs=1, verbose=0, 
+    def __init__(self, estimator, metric=None, cv=2, n_jobs=1, verbose=0, 
                  pre_dispatch='2*n_jobs'):
         self.estimator = estimator
+        self.metric = metric
         self.cv = cv
         self.n_jobs = n_jobs
         self.verbose = verbose
@@ -63,9 +64,19 @@ class CrossValidatingEstimator(BaseDelegatingEstimator):
         self.cv_indices_ = [fit[2] for fit in cv_fits]
         self.cv_predictions_ = prediction
         
+        # If a metric was provided, compute the score
+        if self.metric is not None:
+            metric_args = {}
+            if 'sample_weight' in fit_args:
+                metric_args['sample_weight'] = fit_args['sample_weight']
+            if 'exposure' in fit_args:
+                metric_args['exposure'] = fit_args['exposure']
+            self.score_ = safer_call(self.metric, y, self.cv_predictions_, **metric_args)
+        
         # Fit on entire data set
         self.estimator_ = clone(self.estimator)
         self.estimator_.fit(**fit_args)
+        return self
         
     def fit_predict(self, X, y=None, sample_weight=None, exposure=None):
         self.fit(X=X, y=y, sample_weight=sample_weight, exposure=exposure)
