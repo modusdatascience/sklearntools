@@ -4,29 +4,29 @@ Created on Feb 23, 2016
 @author: jason
 '''
 import numpy as np
-from sklearntools import StagedEstimator, MaskedEstimator,\
+from sklearntools.sklearntools import StagedEstimator, MaskedEstimator,\
     ColumnSubsetTransformer, NonNullSubsetFitter
 from sklearn.linear_model.base import LinearRegression
 from sklearn.linear_model.logistic import LogisticRegression
-from calibration import CalibratedEstimatorCV, ResponseTransformingEstimator,\
+from sklearntools.calibration import CalibratedEstimatorCV, ResponseTransformingEstimator,\
     LogTransformer, PredictorTransformer, HazardToRiskEstimator,\
     MovingAverageSmoothingEstimator, ThresholdClassifier, ProbaPredictingEstimator
 
-from feature_selection import SingleEliminationFeatureImportanceEstimatorCV,\
+from sklearntools.feature_selection import SingleEliminationFeatureImportanceEstimatorCV,\
     BackwardEliminationEstimator, UnivariateFeatureImportanceEstimatorCV,\
     BestKFeatureSelector
 from numpy.testing.utils import assert_raises
-from glm import GLM
+from sklearntools.glm import GLM
 import statsmodels.api as sm
 # from pyearth.earth import Earth
 import warnings
 import pandas
-from model_selection import ModelSelectorCV
-from scoring import log_loss_scorer
+from sklearntools.model_selection import ModelSelectorCV
+from sklearntools.scoring import log_loss_scorer
 from sklearn.ensemble.forest import RandomForestRegressor
 from numpy.ma.testutils import assert_array_almost_equal
-from earth import Earth
-from kfold import CrossValidatingEstimator
+from sklearntools.earth import Earth
+from sklearntools.kfold import CrossValidatingEstimator
 from sklearn.metrics.regression import r2_score
 from sklearn.model_selection import KFold
 warnings.simplefilter("error")
@@ -186,7 +186,7 @@ def test_predictor_transformer_calibration():
     assert np.max(model.final_stage_.estimator_.coef_ - 1.) < .1
     
 def test_pipeline():
-    np.random.seed(1)
+    np.random.seed(3)
     m = 10000
     n = 10
     

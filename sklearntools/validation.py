@@ -107,9 +107,6 @@ def bootstrap(outer_stat, inner_stat, n):
             inner_args = resample(*[np.asarray(arg) for arg in args])
             if type(inner_args) is not list:
                 inner_args = [inner_args]
-#             
-#             for arg in args:
-#                 inner_args.append(resample(np.asarray(arg)))
             result[i] = inner_stat(*inner_args)
         return outer_stat(result)
     return _bootstrap

@@ -1,18 +1,18 @@
 import numpy as np
-from earth import Earth
+from sklearntools.earth import Earth
 from sklearn.linear_model.logistic import LogisticRegression
-from calibration import ProbaPredictingEstimator,\
+from sklearntools.calibration import ProbaPredictingEstimator,\
     ThresholdClassifier
 import pandas
-from sym import model_to_code, sym_predict
+from sklearntools.sym import model_to_code, sym_predict
 from numpy.ma.testutils import assert_array_almost_equal
 import imp
 import execjs
-from calibration import LogTransformer,\
+from sklearntools.calibration import LogTransformer,\
     ResponseTransformingEstimator, CalibratedEstimatorCV, \
     MovingAverageSmoothingEstimator, SelectorTransformer, IntervalTransformer, \
     PredictorTransformer
-from kfold import CrossValidatingEstimator
+from sklearntools.kfold import CrossValidatingEstimator
 
 def exec_module(name, code):
     module = imp.new_module(name)

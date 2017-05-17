@@ -15,14 +15,51 @@ def candidate_grid(estimator, param_grid):
 class ModelSelectorCV(BaseDelegatingEstimator):
     def __init__(self, candidates, scoring, score_combiner=None, cv=2, n_jobs=1, verbose=0, 
                  pre_dispatch='2*n_jobs'):
-        self.candidates = candidates
+        self._process_candidates(candidates)
         self.scoring = scoring
         self.score_combiner = score_combiner
         self.n_jobs = n_jobs
         self.pre_dispatch = pre_dispatch
         self.cv = cv
         self.verbose = verbose
-        
+    
+    def _process_candidates(self, candidates):
+        '''
+        Convert candidates from whatever it is and assign self.candidates and self.candidate_names.
+        '''
+        converted = False
+        try:
+            pairs = list(candidates.items())
+            converted = True
+        except AttributeError:
+            pass
+        if not converted:
+            try:
+                pairs = [(cand[0], cand[1]) for cand in candidates]
+            except IndexError:
+                pass
+            except TypeError:
+                pass
+        if not converted:
+            pairs = [('candidate_%d' % i, candidate) for i, candidate in enumerate(candidates)]
+        self.candidates = [pair[1] for pair in pairs]
+        self.candidate_names = [pair[0] for pair in pairs]
+    
+    def iter_candidates(self):
+        return list(self.candidates)
+            
+    def iter_candidate_names(self):
+        return list(self.candidate_names)
+    
+    def iter_candidate_pairs(self):
+        return zip(self.candidate_names, self.candidates)
+    
+    def iter_fitted_candidates(self):
+        return list(self.candidates_)
+    
+    def iter_fitted_candidate_pairs(self):
+        return zip(self.candidate_names, self.candidates_)
+    
     @property
     def _estimator_type(self):
         return self.estimator._estimator_type

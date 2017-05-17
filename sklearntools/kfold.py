@@ -2,7 +2,7 @@ from sklearn.externals.joblib.parallel import Parallel, delayed
 from calibration import no_cv
 from sklearn.cross_validation import check_cv
 from sklearn.base import is_classifier, clone
-from sklearntools import _fit_and_predict, standard_methods, BaseDelegatingEstimator, safe_assign_subset
+from sklearntools import _fit_and_predict, non_fit_methods, BaseDelegatingEstimator, safe_assign_subset
 import numpy as np
 from sym import sym_predict, syms, sym_predict_parts, sym_transform_parts
 
@@ -14,7 +14,7 @@ class CrossValidatingEstimator(BaseDelegatingEstimator):
         self.n_jobs = n_jobs
         self.verbose = verbose
         self.pre_dispatch = pre_dispatch
-        self._create_delegates('estimator', standard_methods)
+        self._create_delegates('estimator', non_fit_methods)
     
     @property
     def _estimator_type(self):
@@ -32,7 +32,7 @@ class CrossValidatingEstimator(BaseDelegatingEstimator):
     def syms(self):
         return syms(self.estimator_)
     
-    def fit_predict(self, X, y=None, sample_weight=None, exposure=None):
+    def fit(self, X, y=None, sample_weight=None, exposure=None):
         # For later
         parallel = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
                         pre_dispatch=self.pre_dispatch)
@@ -60,8 +60,13 @@ class CrossValidatingEstimator(BaseDelegatingEstimator):
         
         # Store cross validation models
         self.cv_estimators_ = [fit[0] for fit in cv_fits]
+        self.cv_indices_ = [fit[2] for fit in cv_fits]
+        self.cv_predictions_ = prediction
         
         # Fit on entire data set
-        self.fit(**fit_args)
+        self.estimator_ = clone(self.estimator)
+        self.estimator_.fit(**fit_args)
         
-        return prediction
+    def fit_predict(self, X, y=None, sample_weight=None, exposure=None):
+        self.fit(X=X, y=y, sample_weight=sample_weight, exposure=exposure)
+        return self.cv_predictions_.copy()
