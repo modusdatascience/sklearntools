@@ -8,7 +8,7 @@ import numpy as np
 from six import with_metaclass
 from functools import update_wrapper
 from inspect import getargspec
-from sym import syms, sym_update, sym_predict, sym_transform_parts, sym_predict_parts
+from sym import syms, sym_update, sym_predict, sym_transform_parts, sym_predict_parts, sym_predict_proba
 import pandas
 from sympy.functions.elementary.miscellaneous import Max, Min
 from sympy.core.numbers import RealNumber
@@ -252,15 +252,13 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
                 new_expressions = []
                 inputs = syms(stage)
                 for expr in stage_expressions:
-#                     assert not set(inputs) & expr.free_symbols, 'Name collision in stage symbols'
                     new_expressions.append(expr.subs(dict(zip(inputs, expressions))))
                 expressions = new_expressions
             else:
                 expressions = stage_expressions
         return expressions
- 
-    def fit(self, X, y=None, sample_weight=None, exposure=None):
-        data = self._process_args(X=X, y=y, sample_weight=sample_weight, exposure=exposure)
+    
+    def fit_update(self, data):
         self.intermediate_stages_ = []
         for stage in self.intermediate_stages:
             # Stage knows to discard whatever it doesn't need
@@ -274,10 +272,17 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
                 except:
                     data['X'] = safe_call(stage_.transform, self._transform_args(data))
             self.intermediate_stages_.append(stage_)
-#             if 'X' in data and len(data['X'].shape) == 1:
-#                 data['X'] = data['X'][:, None]
+        return data
+    
+    def fit(self, X, y=None, sample_weight=None, exposure=None):
+        data = self.fit_update(self._process_args(X=X, y=y, sample_weight=sample_weight, exposure=exposure))
         self.final_stage_ = safe_call(clone(self.final_stage).fit, data)
         return self
+    
+    def fit_predict(self, X, y=None, sample_weight=None, exposure=None):
+        data = self.fit_update(self._process_args(X=X, y=y, sample_weight=sample_weight, exposure=exposure))
+        self.final_stage_ = clone(self.final_stage)
+        return safe_call(self.final_stage_.fit_predict, data)
     
     def transform(self, X, exposure=None):
         data = self._process_args(X=X, exposure=exposure)
@@ -287,6 +292,15 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
     def sym_predict(self):
         expressions = self._sym_update()
         expression = sym_predict(self.final_stage_)
+        symbols =  syms(self.final_stage_)
+        expression = expression.subs(dict(zip(symbols, expressions)))
+#         for expr, sym in zip(expressions, symbols):
+#             expression = expression.subs(sym, expr)
+        return expression
+    
+    def sym_predict_proba(self):
+        expressions = self._sym_update()
+        expression = sym_predict_proba(self.final_stage_)
         symbols =  syms(self.final_stage_)
         expression = expression.subs(dict(zip(symbols, expressions)))
 #         for expr, sym in zip(expressions, symbols):
@@ -488,11 +502,14 @@ class DelegatingMetaClass(type):
 #         obj._delegates = {}
 
 standard_methods = ['fit', 'predict', 'score', 'predict_proba', 'decision_function', 
-                         'predict_log_proba', 'transform']
+                         'predict_log_proba', 'transform', 'fit_predict']
 non_fit_methods = ['predict', 'score', 'predict_proba', 'decision_function', 
                          'predict_log_proba', 'transform']
 predict_methods = ['predict', 'predict_proba', 'decision_function', 
                          'predict_log_proba']
+sym_methods = ['syms', 'sym_predict', 'sym_transform', 
+               'sym_predict_parts', 'sym_transform_parts', 'sym_predict_proba']
+
 
 class BaseDelegatingEstimator(with_metaclass(DelegatingMetaClass, STSimpleEstimator, MetaEstimatorMixin)):
     def _create_delegates(self, name, method_names):
@@ -533,6 +550,30 @@ class BaseDelegatingEstimator(with_metaclass(DelegatingMetaClass, STSimpleEstima
      
     @delegate
     def transform(self):
+        pass
+    
+    @delegate
+    def syms(self):
+        pass
+    
+    @delegate
+    def sym_predict(self):
+        pass
+    
+    @delegate
+    def sym_transform(self):
+        pass
+    
+    @delegate
+    def sym_predict_parts(self):
+        pass
+    
+    @delegate
+    def sym_transform_parts(self):
+        pass
+    
+    @delegate
+    def sym_predict_proba(self):
         pass
 
 class DelegatingEstimator(BaseDelegatingEstimator):

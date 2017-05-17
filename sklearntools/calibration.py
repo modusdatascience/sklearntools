@@ -8,7 +8,7 @@ import numpy as np
 from sklearn.utils.metaestimators import if_delegate_has_method
 from sym import sym_transform, sym_predict, sym_predict_proba, syms, sym_predict_parts, \
     sym_transform_parts
-from sklearntools import safe_assign_subset, _fit_and_predict
+from sklearntools import safe_assign_subset, _fit_and_predict, safer_call
 from sympy.core.symbol import Symbol
 from numpy import inf
 from sympy.functions.elementary.exponential import log
@@ -534,7 +534,7 @@ class ProbaPredictingEstimator(DelegatingEstimator):
         return self
     
     def predict(self, X, *args, **kwargs):
-        return self.estimator_.predict_proba(X, *args, **kwargs)[:, 1:]
+        return safer_call(self.estimator_.predict_proba, X, *args, **kwargs)[:, 1:]
     
     def sym_transform(self):
         return sym_transform(self.estimator_)
