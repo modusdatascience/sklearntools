@@ -1,17 +1,10 @@
-from sklearntools import STSimpleEstimator, BaseDelegatingEstimator,\
-    _fit_and_score, standard_methods, non_fit_methods, safer_call
-from sklearn.base import MetaEstimatorMixin, is_classifier, clone
-from itertools import product
-from sklearn.cross_validation import check_cv
-from sklearn.externals.joblib.parallel import Parallel, delayed
-import numpy as np
+from sklearntools import BaseDelegatingEstimator,\
+    non_fit_methods, safer_call
+from sklearn.base import clone
 from sklearn.metrics.scorer import check_scoring
-from feature_selection import check_score_combiner
-from calibration import no_cv
 
 def candidate_grid(estimator, param_grid):
     pass
-
 
 class ModelSelector(BaseDelegatingEstimator):
     def __init__(self, candidates, scoring=None):
@@ -84,8 +77,6 @@ class ModelSelector(BaseDelegatingEstimator):
             else:
                 score = safer_call(scorer, candidate_, **fit_args)
                     
-#             score, _, candidate_ = _fit_and_score(clone(candidate), fit_args, scorer, slice(None), slice(None))
-            
             # Store the results
             self.candidate_scores_.append(score)
             self.candidates_.append(candidate_)
@@ -102,13 +93,6 @@ class ModelSelector(BaseDelegatingEstimator):
         self.best_estimator = best_candidate
         self._create_delegates('best_estimator', non_fit_methods)
         del self.best_estimator
-        # Fit the best candidate
-        
-#         self.best_estimator = best_candidate
-#         self.best_estimator_ = clone(best_candidate).fit(**fit_args)
-#         self.best_score_ = best_score
-#         self._create_delegates('best_estimator', non_fit_methods)
-#         del self.best_estimator
         return self
             
             

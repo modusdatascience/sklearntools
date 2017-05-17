@@ -20,6 +20,7 @@ def check_score_combiner(estimator, score_combiner):
     else:
         raise NotImplementedError('Score combiner %s not implemented' % str(score_combiner))
 
+# TODO: Remove all CV stuff from this.  Instead, rely on composition with CrossValidatingEstimator
 class BaseFeatureImportanceEstimatorCV(BaseDelegatingEstimator):
     def __init__(self, estimator, cv=None, scoring=None,
                  score_combiner=None, n_jobs=1, verbose=0, pre_dispatch='2*n_jobs'):
