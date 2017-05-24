@@ -17,11 +17,45 @@ from sklearntools.kfold import CrossValidatingEstimator
 from sklearn.tree.tree import DecisionTreeRegressor
 from nose.tools import assert_almost_equal
 from sklearntools.sym.syms import syms
+from sklearn.ensemble.gradient_boosting import GradientBoostingClassifier
+from sklearntools.sym.sym_predict_proba import sym_predict_proba
 
 def exec_module(name, code):
     module = imp.new_module(name)
     exec code in module.__dict__
     return module
+
+
+def test_gradient_boosting_classifier_export():
+    np.random.seed(1)
+    
+    # Create some data
+    m = 10000
+    X = np.random.normal(size=(m,10))
+    thresh = np.random.normal(size=10)
+    X_transformed = X * (X > thresh)
+    beta = np.random.normal(size=10)
+    y = (np.dot(X_transformed, beta) + np.random.normal(size=m)) > 0
+    
+    # Train a gradient boosting classifier
+    model = GradientBoostingClassifier(max_depth=10, n_estimators=10)
+    model.fit(X, y)
+    
+    # Export as sympy expression
+    expr = sym_predict_proba(model)
+    
+    # Check some values
+    y_pred = model.predict_proba(X)[:,1]
+    X_ = pandas.DataFrame(X, columns=[s.name for s in syms(model)])
+    for i in range(10):
+        row = dict(X_.iloc[i,:])
+        assert_almost_equal(y_pred[i], expr.evalf(16, row))
+    
+    # Export python code and check output
+    code = model_to_code(model, 'numpy', 'predict_proba', 'test_model')
+    numpy_test_module = exec_module('numpy_test_module', code)
+    y_pred_numpy = numpy_test_module.test_model(**X_)
+    assert_array_almost_equal(np.ravel(y_pred_numpy), np.ravel(y_pred))
 
 def test_decision_tree_export():
     np.random.seed(1)
@@ -51,7 +85,7 @@ def test_decision_tree_export():
     # Export python code and check output
     numpy_test_module = exec_module('numpy_test_module', model_to_code(model, 'numpy', 'predict', 'test_model'))
     y_pred_numpy = numpy_test_module.test_model(**X_)
-    assert_array_almost_equal(np.ravel(y_pred_numpy), np.ravel(model.predict(X)))
+    assert_array_almost_equal(np.ravel(y_pred_numpy), np.ravel(y_pred))
     
 def test_sympy_export():
     np.random.seed(1)

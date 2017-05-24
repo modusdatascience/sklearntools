@@ -9,6 +9,7 @@ from operator import add
 from .parts import trim_parts, assert_parts_are_composable
 from .sym_predict_parts import sym_predict_parts
 from .sym_transform_parts import sym_transform_parts
+from .sym_predict_proba_parts import sym_predict_proba_parts
 
 class STJavaScriptPrinter(JavascriptCodePrinter):
     def _print_Max(self, expr):
@@ -207,7 +208,8 @@ def parts_to_code(parts, language, function_name, all_variables):
 #     return assignment_pairs_and_outputs_to_code(pairs_and_outputs, language, function_name, inputs, all_variables)
 
 model_to_code_method_dispatch = {'predict': sym_predict_parts,
-                                 'transform': sym_transform_parts}
+                                 'transform': sym_transform_parts,
+                                 'predict_proba': sym_predict_proba_parts}
 
 def model_to_code(model, language, method, function_name, all_variables=False):
     parts = model_to_code_method_dispatch[method](model)
