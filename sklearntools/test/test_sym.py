@@ -14,12 +14,40 @@ from sklearntools.calibration import LogTransformer,\
     MovingAverageSmoothingEstimator, SelectorTransformer, IntervalTransformer, \
     PredictorTransformer
 from sklearntools.kfold import CrossValidatingEstimator
+from sklearn.tree.tree import DecisionTreeRegressor
+from nose.tools import assert_almost_equal
+from sklearntools.sym.syms import syms
 
 def exec_module(name, code):
     module = imp.new_module(name)
     exec code in module.__dict__
     return module
 
+def test_decision_tree_export():
+    np.random.seed(1)
+    
+    # Create some data
+    m = 10000
+    X = np.random.normal(size=(m,10))
+    thresh = np.random.normal(size=10)
+    X_transformed = X * (X > thresh)
+    beta = np.random.normal(size=10)
+    y = np.dot(X_transformed, beta) + np.random.normal(size=m)
+    
+    # Train a decision tree regressor
+    model = DecisionTreeRegressor(max_depth=10)
+    model.fit(X, y)
+    
+    # Export as sympy expression
+    expr = sym_predict(model)
+    
+    # Check some values
+    y_pred = model.predict(X)
+    X_ = pandas.DataFrame(X, columns=[s.name for s in syms(model)])
+    for i in range(10):
+        row = dict(X_.iloc[i,:])
+        assert_almost_equal(y_pred[i], expr.evalf(16, row))
+    
 def test_sympy_export():
     np.random.seed(1)
     m = 1000
@@ -88,11 +116,13 @@ def test_more_sym_stuff():
     assert_array_almost_equal(np.ravel(y_pred), np.ravel(model.predict(X)))
     
 if __name__ == '__main__':
-    test_more_sym_stuff()
-    test_sympy_export()
-    print 'Success!'
-    
-    
+    import sys
+    import nose
+    # This code will run the test in this file.'
+    module_name = sys.modules[__name__].__file__
 
+    result = nose.run(argv=[sys.argv[0],
+                            module_name,
+                            '-s', '-v'])
 
 
