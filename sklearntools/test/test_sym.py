@@ -48,6 +48,11 @@ def test_decision_tree_export():
         row = dict(X_.iloc[i,:])
         assert_almost_equal(y_pred[i], expr.evalf(16, row))
     
+    # Export python code and check output
+    numpy_test_module = exec_module('numpy_test_module', model_to_code(model, 'numpy', 'predict', 'test_model'))
+    y_pred_numpy = numpy_test_module.test_model(**X_)
+    assert_array_almost_equal(np.ravel(y_pred_numpy), np.ravel(model.predict(X)))
+    
 def test_sympy_export():
     np.random.seed(1)
     m = 1000
