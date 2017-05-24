@@ -1,175 +1,14 @@
-from pyearth.earth import Earth
-from pyearth.export import export_sympy_term_expressions, export_sympy
-from sklearn.linear_model.logistic import LogisticRegression
-from sympy.core.numbers import RealNumber
-from sympy.functions.elementary.exponential import exp
-from sympy.core.symbol import Symbol
-from sklearn.linear_model.base import LinearRegression
-import numpy as np
-from sympy.printing.lambdarepr import NumPyPrinter
 from sympy.printing.jscode import JavascriptCodePrinter
 import os
-from resources import resources
+from .resourcepath import resources
 from mako.template import Template
+from sympy.printing.lambdarepr import NumPyPrinter
 from sympy.printing.python import PythonPrinter
-import autopep8
 from _collections import defaultdict
-from itertools import chain, compress
-from operator import add, or_
-
-def call_method_or_dispatch(method_name, dispatcher):
-    def _call_method_or_dispatch(estimator, *args, **kwargs):
-        try:
-            return getattr(estimator, method_name)(*args, **kwargs)
-        except AttributeError:
-            for klass in type(estimator).mro():
-                if klass in dispatcher:
-                    exporter = dispatcher[klass]
-                    return exporter(estimator, *args, **kwargs)
-            raise
-        except:
-            raise
-    _call_method_or_dispatch.__name__ = method_name
-    return _call_method_or_dispatch
-
-def fallback(*args):
-    def _fallback(*inner_args, **kwargs):
-        steps = list(args)
-        while steps:
-            try:
-                return steps.pop(0)(*inner_args, **kwargs)
-            except AttributeError:
-                if not steps:
-                    raise
-    _fallback.__name__ = args[0].__name__
-    return _fallback
-
-def input_size_from_coef(estimator):
-    assert hasattr(estimator, 'coef_')
-    coef = estimator.coef_
-    n_inputs = coef.shape[-1]
-    return n_inputs
-
-def input_size_earth(estimator):
-    return len(estimator.xlabels_)
-
-input_size_dispatcher = {LogisticRegression: input_size_from_coef,
-                         Earth: input_size_earth}
-input_size = call_method_or_dispatch('input_size', input_size_dispatcher)
-
-def syms_x(estimator):
-    return [Symbol('x%d' % d) for d in range(input_size(estimator))]
-
-def syms_earth(estimator):
-    return [Symbol(label) for label in estimator.xlabels_]
-
-syms_dispatcher = {LogisticRegression: syms_x,
-                   Earth: syms_earth}
-syms = call_method_or_dispatch('syms', syms_dispatcher)
-
-def sym_predict_linear(estimator):
-    if hasattr(estimator, 'intercept_'):
-        expression = RealNumber(estimator.intercept_[0])
-    else:
-        expression = RealNumber(0)
-    symbols = syms(estimator)
-    for coef, sym in zip(np.ravel(estimator.coef_), symbols):
-        expression += RealNumber(coef) * sym
-    return expression
-
-def sym_predict_logist_regression(logistic_regression):
-    return RealNumber(1) / (RealNumber(1) + exp(-sym_predict_linear(logistic_regression)))
-    
-sym_predict_dispatcher = {Earth: export_sympy,
-                     LogisticRegression: sym_predict_logist_regression,
-                     LinearRegression: sym_predict_linear}
-sym_predict = call_method_or_dispatch('sym_predict', sym_predict_dispatcher)
-
-sym_predict_proba_dispatcher = {LogisticRegression: sym_predict_logist_regression}
-sym_predict_proba = call_method_or_dispatch('sym_predict_proba', sym_predict_proba_dispatcher)
-
-def assert_parts_are_composable(parts):
-    inputs, expressions, target = parts
-    try:
-        assert set(inputs) >= set(chain(*map(lambda x:x.free_symbols, expressions)))
-    except:
-        assert set(inputs) >= set(chain(*map(lambda x:x.free_symbols, expressions)))
-    if target is not None:
-        target_inputs, _, _ = target
-        try:
-            assert len(target_inputs) == len(expressions) 
-            assert_parts_are_composable(target)
-        except:
-            assert len(target_inputs) == len(expressions) 
-            assert_parts_are_composable(target)
-def double_check(fn):
-    def _double_check(*args, **kwargs):
-        result = fn(*args, **kwargs)
-        try:
-            assert_parts_are_composable(result)
-        except:
-            raise
-        return result
-    return _double_check
-
-def sym_predict_parts_base(obj, target=None):
-    return (syms(obj), [sym_predict(obj)], target)
-
-sym_predict_parts_dispatcher = {}
-sym_predict_parts = double_check(fallback(call_method_or_dispatch('sym_predict_parts', sym_predict_parts_dispatcher), sym_predict_parts_base))
-
-sym_transform_dispatcher = {Earth: export_sympy_term_expressions}
-sym_transform = call_method_or_dispatch('sym_transform', sym_transform_dispatcher)
-
-def sym_transform_parts_base(obj, target=None):
-    return (syms(obj), sym_transform(obj), target)
-
-sym_transform_parts_dispatcher = {}
-sym_transform_parts = double_check(fallback(call_method_or_dispatch('sym_transform_parts', sym_transform_parts_dispatcher), sym_transform_parts_base))
-
-def assemble_parts_into_expressions(parts):
-    inputs, expressions, target = parts
-    if target is not None:
-        target_inputs, target_expressions, target_target = target
-        assert len(target_inputs) == len(expressions)
-        composed_expressions = [expr.subs(dict(zip(target_inputs, expressions))) for expr in target_expressions]
-        return assemble_parts_into_expressions((inputs, composed_expressions, target_target))
-    else:
-        return inputs, expressions
-    
-def trim_parts(parts, top=True):
-    inputs, expressions, target = parts
-    if target is None:
-        used_symbols = reduce(add, map(lambda x: x.free_symbols, expressions))
-        result, index_result = ([inp for inp in inputs if inp in used_symbols], expressions, None), [inp in used_symbols for inp in inputs]
-    else:
-        target_result, index = trim_parts(target, top=False)
-        used_expressions = list(compress(expressions, index))
-        used_symbols = reduce(or_, map(lambda x: x.free_symbols, used_expressions))
-        used_inputs = [inp for inp in inputs if inp in used_symbols]
-        new_index = [inp in used_symbols for inp in inputs]
-        result, index_result = (used_inputs, used_expressions, target_result), new_index
-    if top:
-        return result
-    else:
-        return result, index_result
-    
-def assemble_parts_into_assignment_pairs_and_outputs(parts):
-    _, expressions, target = parts
-    result = []
-    if target is not None:
-        target_inputs, _, _ = target
-        assert len(target_inputs) == len(expressions)
-        result.extend(zip(target_inputs, expressions))
-        target_result, outputs = assemble_parts_into_assignment_pairs_and_outputs(target)
-        result.extend(target_result)
-        return result, outputs
-    else:
-        return result, expressions
-
-    
-sym_update_dispatcher = {}
-sym_update = fallback(call_method_or_dispatch('sym_update', sym_update_dispatcher), sym_transform)
+from operator import add
+from .parts import trim_parts, assert_parts_are_composable
+from .sym_predict_parts import sym_predict_parts
+from .sym_transform_parts import sym_transform_parts
 
 class STJavaScriptPrinter(JavascriptCodePrinter):
     def _print_Max(self, expr):
@@ -375,5 +214,4 @@ def model_to_code(model, language, method, function_name, all_variables=False):
     assert_parts_are_composable(parts)
     result = parts_to_code(parts, language, function_name, all_variables)
     return result
-    
     

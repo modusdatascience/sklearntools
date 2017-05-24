@@ -9,6 +9,6 @@ setup(name='sklearntools',
       author_email='jcrudy@gmail.com',
       url='https://gitlab.com/jcrudy/sklearntools',
       packages=['sklearntools'],
-      package_data = {'': ['resources/*']},
+      package_data = {'': ['sym/resources/*']},
       install_requires = ['scikit-learn>=0.17.0', 'pandas', 'numpy']
      )

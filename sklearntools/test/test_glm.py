@@ -1,7 +1,7 @@
 from nose.tools import assert_equal, assert_not_equal, assert_true, assert_false, \
     assert_almost_equal, assert_list_equal
 import numpy as np
-from .glm import BinomialRegressor, GammaRegressor, GaussianRegressor, \
+from ..glm import BinomialRegressor, GammaRegressor, GaussianRegressor, \
     InverseGaussianRegressor, NegativeBinomialRegressor, PoissonRegressor
 from statsmodels.genmod.families.family import Binomial, Gamma, Gaussian,\
     InverseGaussian, NegativeBinomial, Poisson

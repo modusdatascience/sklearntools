@@ -4,7 +4,8 @@ from sklearn.linear_model.logistic import LogisticRegression
 from sklearntools.calibration import ProbaPredictingEstimator,\
     ThresholdClassifier
 import pandas
-from sklearntools.sym import model_to_code, sym_predict
+from sklearntools.sym.printers import model_to_code
+from sklearntools.sym.sym_predict import sym_predict
 from numpy.ma.testutils import assert_array_almost_equal
 import imp
 import execjs

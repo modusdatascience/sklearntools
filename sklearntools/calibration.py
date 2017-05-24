@@ -1,13 +1,17 @@
 from sklearntools import STSimpleEstimator, DelegatingEstimator, non_fit_methods,\
-    standard_methods, _subset, safe_col_select, safe_call, safe_column_names
+    standard_methods, safe_col_select, safe_call, safe_column_names
 from sklearn.base import MetaEstimatorMixin, is_classifier, clone,\
     TransformerMixin
 from sklearn.cross_validation import check_cv
 from sklearn.externals.joblib.parallel import Parallel, delayed
 import numpy as np
 from sklearn.utils.metaestimators import if_delegate_has_method
-from sym import sym_transform, sym_predict, sym_predict_proba, syms, sym_predict_parts, \
-    sym_transform_parts
+from sym.sym_transform import sym_transform
+from sym.sym_predict import sym_predict
+from sym.sym_predict_proba import sym_predict_proba
+from sym.syms import syms
+from sym.sym_predict_parts import sym_predict_parts
+from sym.sym_transform_parts import sym_transform_parts
 from sklearntools import safe_assign_subset, _fit_and_predict, safer_call
 from sympy.core.symbol import Symbol
 from numpy import inf

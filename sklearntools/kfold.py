@@ -4,7 +4,10 @@ from sklearn.cross_validation import check_cv
 from sklearn.base import is_classifier, clone
 from sklearntools import _fit_and_predict, non_fit_methods, BaseDelegatingEstimator, safe_assign_subset, safer_call
 import numpy as np
-from sym import sym_predict, syms, sym_predict_parts, sym_transform_parts
+from sym.sym_predict import sym_predict
+from sym.syms import syms
+from sym.sym_predict_parts import sym_predict_parts
+from sym.sym_transform_parts import sym_transform_parts
 
 class CrossValidatingEstimator(BaseDelegatingEstimator):
     def __init__(self, estimator, metric=None, cv=2, n_jobs=1, verbose=0, 

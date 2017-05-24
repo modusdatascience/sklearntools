@@ -8,12 +8,17 @@ import numpy as np
 from six import with_metaclass
 from functools import update_wrapper
 from inspect import getargspec
-from sym import syms, sym_update, sym_predict, sym_transform_parts, sym_predict_parts, sym_predict_proba
+from sym.syms import syms
+from sym.sym_update import sym_update
+from sym.sym_predict import sym_predict
+from sym.sym_transform_parts import sym_transform_parts
+from sym.sym_predict_parts import sym_predict_parts
+from sym.sym_predict_proba import sym_predict_proba
 import pandas
 from sympy.functions.elementary.miscellaneous import Max, Min
 from sympy.core.numbers import RealNumber
 from itertools import chain
-from sym import sym_transform
+from sym.sym_transform import sym_transform
 from sympy.core.symbol import Symbol
 from . import __version__
 # 
