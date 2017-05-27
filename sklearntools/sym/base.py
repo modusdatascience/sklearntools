@@ -25,3 +25,9 @@ def fallback(*args):
                     raise
     _fallback.__name__ = args[0].__name__
     return _fallback
+
+def create_registerer(dispatcher, name):
+    def _register(cls, function):
+        dispatcher[cls] = function
+    _register.__name__ = name
+    return _register

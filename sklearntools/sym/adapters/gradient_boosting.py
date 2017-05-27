@@ -1,10 +1,13 @@
 from sympy.core.numbers import RealNumber
 from sympy.functions.elementary.exponential import exp
 from sklearn.ensemble.gradient_boosting import BinomialDeviance,\
-    LogOddsEstimator
+    LogOddsEstimator, GradientBoostingClassifier
 from ..base import call_method_or_dispatch
-from .trees import sym_predict_decision_tree_regressor
 from operator import add
+from ..sym_predict_proba import register_sym_predict_proba
+from ..sym_predict import sym_predict
+from sklearntools.sym.input_size import register_input_size,\
+    input_size_from_n_features
 
 def sym_binomial_deviance_score_to_proba(loss, score):
     return RealNumber(1) / (RealNumber(1) + exp(RealNumber(-1) * score))
@@ -21,7 +24,10 @@ sym_init_function = call_method_or_dispatch('sym_init_function', sym_init_functi
 
 def sym_predict_proba_gradient_boosting_classifier(estimator):
     learning_rate = RealNumber(estimator.learning_rate)
-    trees = map(sym_predict_decision_tree_regressor, estimator.estimators_[:,0])
+    trees = map(sym_predict, estimator.estimators_[:,0])
     tree_part = learning_rate * reduce(add, trees)
     init_part = sym_init_function(estimator.init_)
     return sym_loss_function(estimator.loss_, tree_part + init_part)
+
+register_sym_predict_proba(GradientBoostingClassifier, sym_predict_proba_gradient_boosting_classifier)
+register_input_size(GradientBoostingClassifier, input_size_from_n_features)
