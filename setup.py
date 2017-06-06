@@ -1,5 +1,6 @@
 from distutils.core import setup
 import versioneer
+from setuptools import find_packages
 
 setup(name='sklearntools',
       version=versioneer.get_version(),
@@ -8,7 +9,7 @@ setup(name='sklearntools',
       author='Jason Rudy',
       author_email='jcrudy@gmail.com',
       url='https://gitlab.com/jcrudy/sklearntools',
-      packages=['sklearntools'],
+      packages=find_packages(),
       package_data = {'': ['sym/resources/*']},
       install_requires = ['scikit-learn>=0.17.0', 'pandas', 'numpy']
      )
