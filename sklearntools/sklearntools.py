@@ -143,6 +143,22 @@ class SklearnTool(object):
 #         result.append(new_name)
 #     return result
 
+def fit_predict(estimator, X, y=None, sample_weight=None, exposure=None):
+    fit_args = {'X': X}
+    predict_args = {'X': X}
+    if y is not None:
+        fit_args['y'] = y
+    if sample_weight is not None:
+        fit_args['sample_weight'] = sample_weight
+    if exposure is not None:
+        fit_args['exposure'] = exposure
+        predict_args['exposure'] = exposure
+    if hasattr(estimator, 'fit_predict'):
+        return estimator.fit_predict(**fit_args)
+    else:
+        estimator.fit(**fit_args)
+        return estimator.predict(**predict_args)
+
 class STEstimator(BaseEstimator, SklearnTool):
     def __sub__(self, other):
         '''
