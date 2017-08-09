@@ -21,6 +21,7 @@ from itertools import chain
 from sym.sym_transform import sym_transform
 from sympy.core.symbol import Symbol
 from . import __version__
+from toolz.functoolz import curry
 # 
 # def if_delegate_has_method(*args, **kwargs):
 #     return decorator(sklearn_if_delegate_has_method(*args, **kwargs))
@@ -70,6 +71,40 @@ def safer_call(fn, *args, **kwargs):
 
 def safe_concat(arrays):
     return pandas.concat([pandas.DataFrame(arr) for arr in arrays], axis=0).as_matrix()
+
+def make2d(x):
+    if len(x.shape) == 1:
+        return x[:, None]
+    return x
+
+@curry
+def growd(d, x):
+    shape = x.shape
+    l = len(shape)
+    if l >= d:
+        return x
+    else:
+        slice_args = ([slice(None)] * l) + [None] * (d-l)
+        return x.__getitem__(slice_args)
+
+@curry
+def shrinkd(d, x):
+    shape = x.shape
+    l = len(shape)
+    if l <= d:
+        return x
+    else:
+        slice_args = [slice(None) for _ in range(d)]
+        hit = False
+        for i in range(d, l):
+            if shape[i] == 1 and not hit:
+                slice_args.append(0)
+            else:
+                hit = True
+                slice_args.append(slice(None))
+        return x.__getitem__(slice_args)
+         
+        
 
 def _subset(data, idx):
     if len(data.shape) == 1:
