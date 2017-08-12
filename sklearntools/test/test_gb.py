@@ -68,7 +68,7 @@ def test_gradient_boosting_estimator():
     y = np.random.lognormal(mu)
     loss_function = SmoothQuantileLossFunction(1, p, .0001)
     q_loss = QuantileLossFunction(1, p)
-    model = GradientBoostingEstimator(Earth(), loss_function, n_estimators=100)
+    model = GradientBoostingEstimator(Earth(max_degree=2, verbose=True, use_fast=True), loss_function, n_estimators=100)
     model.fit(X, y)
     prediction = model.predict(X)
     model2 = GradientBoostingRegressor(loss='quantile', alpha=p)

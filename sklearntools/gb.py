@@ -141,7 +141,7 @@ class GradientBoostingEstimator(STSimpleEstimator):
 #             if np.linalg.norm(delta) / float(len(delta)) < 1e-10:
 #                 pass
             if abs(losses[-1] - losses[-2]) < 1e-10:
-                print 'early terminate after %d iterations' % (i+1)
+                print 'early termination after %d iterations' % (i+1)
                 break
             print 'loss_diff =', abs(losses[-1] - losses[-2])
             gradient_args['pred'] = prediction
