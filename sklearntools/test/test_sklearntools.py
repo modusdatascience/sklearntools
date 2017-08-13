@@ -449,23 +449,13 @@ def test_linear_transformation():
     assert_array_almost_equal(combination.predict(X), 2 * np.ravel(model1.predict(X)) - np.ravel(model2.predict(X)))
 
 if __name__ == '__main__':
-    test_cross_validating_estimator()
-    test_single_elimination_feature_importance_estimator_cv()
-    test_univariate_feature_importance_estimator_cv()
-    test_k_best_feature_selector()
-    test_backward_elimination_estimation()
-    test_multiple_response_regressor()
-    test_calibration()
-    test_predictor_transformer_calibration()
-    test_pipeline()
-    test_response_transforming_estimator()
-    test_hazard_to_risk()
-    test_moving_average_smoothing_estimator()
-    test_staged_estimator()
-    test_column_subset_transformer()
-    test_model_selector()
-    test_non_null_row_subset_fitter()
-    test_linear_transformation()
-    print 'Success!'
+    import sys
+    import nose
+    # This code will run the test in this file.'
+    module_name = sys.modules[__name__].__file__
+
+    result = nose.run(argv=[sys.argv[0],
+                            module_name,
+                            '-s', '-v'])
     
     
