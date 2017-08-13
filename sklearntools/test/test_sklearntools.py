@@ -22,14 +22,13 @@ import statsmodels.api as sm
 import warnings
 import pandas
 from sklearntools.model_selection import ModelSelector
-from sklearntools.scoring import log_loss_scorer, log_loss_metric
+from sklearntools.scoring import log_loss_metric
 from sklearn.ensemble.forest import RandomForestRegressor
 from numpy.ma.testutils import assert_array_almost_equal
 from sklearntools.earth import Earth
 from sklearntools.kfold import CrossValidatingEstimator
 from sklearn.metrics.regression import r2_score
 from sklearn.model_selection import KFold
-from sklearn.metrics.classification import log_loss
 warnings.simplefilter("error")
     
 def test_single_elimination_feature_importance_estimator_cv():
