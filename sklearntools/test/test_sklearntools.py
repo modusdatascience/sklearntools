@@ -18,7 +18,6 @@ from sklearntools.feature_selection import SingleEliminationFeatureImportanceEst
 from numpy.testing.utils import assert_raises
 from sklearntools.glm import GLM
 import statsmodels.api as sm
-# from pyearth.earth import Earth
 import warnings
 import pandas
 from sklearntools.model_selection import ModelSelector
