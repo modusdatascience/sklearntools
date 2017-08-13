@@ -13,6 +13,7 @@ from nose import SkipTest
 from distutils.version import LooseVersion
 import sklearn
 from types import MethodType
+from sklearn.cross_validation import train_test_split
 
 # Patch over bug in scikit learn (issue #9539)
 if LooseVersion(sklearn.__version__) <= LooseVersion('0.18.2'):
@@ -59,37 +60,40 @@ def test_one_over_one_plus_exp_x():
 
 def test_gradient_boosting_estimator():
     np.random.seed(0)
-    m = 10000
+    m = 15000
     n = 10
     p = .8
     X = np.random.normal(size=(m,n))
     beta = np.random.normal(size=n)
     mu = np.dot(X, beta)
     y = np.random.lognormal(mu)
+    
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.3)
     loss_function = SmoothQuantileLossFunction(1, p, .0001)
     q_loss = QuantileLossFunction(1, p)
-    model = GradientBoostingEstimator(Earth(max_degree=2, verbose=True, use_fast=True), loss_function, n_estimators=100)
-    model.fit(X, y)
-    prediction = model.predict(X)
+    model = GradientBoostingEstimator(BaggingRegressor(Earth(max_degree=2, verbose=True, use_fast=True, max_terms=10)), 
+                                      loss_function, n_estimators=150)
+    model.fit(X_train, y_train)
+    prediction = model.predict(X_test)
     model2 = GradientBoostingRegressor(loss='quantile', alpha=p)
-    model2.fit(X, y)
-    prediction2 = model2.predict(X)
-    model_loss = loss_function(y, prediction)
-    model2_loss = loss_function(y, prediction2)
+    model2.fit(X_train, y_train)
+    prediction2 = model2.predict(X_test)
+    model_loss = loss_function(y_test, prediction)
+    model2_loss = loss_function(y_test, prediction2)
     
     print 'loss1 =', model_loss
     print 'loss2 =', model2_loss
-    print 'qloss1 =', q_loss(y, prediction)
-    print 'qloss2 =', q_loss(y, prediction2)
-    print 'r2_score_1 =', r2_score(y,prediction)
-    print 'r2_score_2 =', r2_score(y,prediction2) 
-    q = np.mean(y <= prediction)
-    q2 = np.mean(y <= prediction2)
+    print 'qloss1 =', q_loss(y_test, prediction)
+    print 'qloss2 =', q_loss(y_test, prediction2)
+    print 'r2_score_1 =', r2_score(y_test,prediction)
+    print 'r2_score_2 =', r2_score(y_test,prediction2) 
+    q = np.mean(y_test <= prediction)
+    q2 = np.mean(y_test <= prediction2)
     print q, q2
     print model.score_
     assert_less(np.abs(q-p), .05)
     assert_greater(model.score_, 0.)
-    assert_approx_equal(model.score(X, y), model.score_)
+    assert_approx_equal(model.score(X_train, y_train), model.score_)
     
 
     
