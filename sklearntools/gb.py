@@ -126,9 +126,4 @@ class GradientBoostingEstimator(BaseDelegatingEstimator):
         initial_loss = loss_function(initial_prediction)
         return (initial_loss - loss) / initial_loss
         
-#     def predict(self, X, exposure=None):
-#         return self.estimator_.predict(X=X, exposure=exposure)
-#         predict_args = self._process_args(X=X,exposure=exposure)
-#         return sum(shrinkd(1, coef * est.predict(**valmap(shrinkd(1),predict_args))) for est, coef in zip(self.estimators_, self.coefficients_))
-#         
             
