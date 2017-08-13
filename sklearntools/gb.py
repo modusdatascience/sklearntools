@@ -4,9 +4,7 @@ from toolz.dicttoolz import valmap
 from .line_search import golden_section_search, zoom_search, zoom
 import numpy as np
 from sklearn.ensemble.gradient_boosting import RegressionLossFunction,\
-    QuantileEstimator, QuantileLossFunction
-from scipy.optimize.linesearch import line_search
-from matplotlib import pyplot as plt
+    QuantileEstimator
 
 def log_one_plus_exp_x(x):
     lower = -10.
