@@ -1,12 +1,12 @@
-from nose.tools import assert_equal, assert_not_equal, assert_true, assert_false, \
-    assert_almost_equal, assert_list_equal
+from nose.tools import assert_greater
 import numpy as np
-from ..glm import BinomialRegressor, GammaRegressor, GaussianRegressor, \
+from sklearntools.glm import BinomialRegressor, GammaRegressor, GaussianRegressor, \
     InverseGaussianRegressor, NegativeBinomialRegressor, PoissonRegressor
 from statsmodels.genmod.families.family import Binomial, Gamma, Gaussian,\
     InverseGaussian, NegativeBinomial, Poisson
 from sklearn.pipeline import Pipeline
 from sklearn.decomposition.pca import PCA
+from statsmodels.genmod.families.links import log
 
 
 
@@ -25,16 +25,16 @@ class TestGlm():
         y_hat = model.predict(self.X)
         diff = y_hat - y
         rsq = 1 - np.mean(diff**2) / np.mean((y-np.mean(y))**2)
-        assert_true(rsq > .9)
+        assert_greater(rsq, .9)
     
     def test_gamma(self):
         model = GammaRegressor()
-        y = Gamma().fitted(self.eta)
+        y = Gamma(log).fitted(self.eta)
         model.fit(self.X, y)
         y_hat = model.predict(self.X)
         diff = y_hat - y
         rsq = 1 - np.mean(diff**2) / np.mean((y-np.mean(y))**2)
-        assert_true(rsq > .58)
+        assert_greater(rsq, .58)
     
     def test_gaussian(self):
         model = GaussianRegressor()
@@ -43,7 +43,7 @@ class TestGlm():
         y_hat = model.predict(self.X)
         diff = y_hat - y
         rsq = 1 - np.mean(diff**2) / np.mean((y-np.mean(y))**2)
-        assert_true(rsq > .9)
+        assert_greater(rsq, .9)
         
     def test_inverse_gaussian(self):
         model = InverseGaussianRegressor()
@@ -52,7 +52,7 @@ class TestGlm():
         y_hat = model.predict(self.X)
         diff = y_hat - y
         rsq = 1 - np.mean(diff**2) / np.mean((y-np.mean(y))**2)
-        assert_true(rsq > .6)
+        assert_greater(rsq, .6)
         
     def test_negative_binomial(self):
         model = NegativeBinomialRegressor()
@@ -61,7 +61,7 @@ class TestGlm():
         y_hat = model.predict(self.X)
         diff = y_hat - y
         rsq = 1 - np.mean(diff**2) / np.mean((y-np.mean(y))**2)
-        assert_true(rsq > .9)
+        assert_greater(rsq, .9)
         
     def test_poisson(self):
         model = PoissonRegressor()
@@ -70,7 +70,7 @@ class TestGlm():
         y_hat = model.predict(self.X)
         diff = y_hat - y
         rsq = 1 - np.mean(diff**2) / np.mean((y-np.mean(y))**2)
-        assert_true(rsq > .9)
+        assert_greater(rsq, .9)
         
     def test_poisson_exposure(self):
         model = PoissonRegressor()
@@ -80,7 +80,7 @@ class TestGlm():
         y_hat = model.predict(self.X, exposure=exposure)
         diff = y_hat - y
         rsq = 1 - np.mean(diff**2) / np.mean((y-np.mean(y))**2)
-        assert_true(rsq > .9)
+        assert_greater(rsq, .9)
     
     def test_with_pipeline(self):
         model = Pipeline([('PCA',PCA()), ('Poisson',PoissonRegressor())])
@@ -89,12 +89,17 @@ class TestGlm():
         y_hat = model.predict(self.X)
         diff = y_hat - y
         rsq = 1 - np.mean(diff**2) / np.mean((y-np.mean(y))**2)
-        assert_true(rsq > .9)
+        assert_greater(rsq, .9)
 #         assert_equal(str(model), '''Pipeline(PCA=PCA(copy=True, n_components=None, whiten=False), PCA__copy=True,
 #      PCA__n_components=None, PCA__whiten=False, Poisson=PoissonRegressor())''')
         
 if __name__ == '__main__':
+    import sys
     import nose
-    nose.run(argv=[__file__, '-s', '-v'])
-    
+    # This code will run the test in this file.'
+    module_name = sys.modules[__name__].__file__
+
+    result = nose.run(argv=[sys.argv[0],
+                            module_name,
+                            '-s', '-v'])
     

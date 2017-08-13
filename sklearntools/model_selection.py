@@ -103,9 +103,7 @@ class ModelSelector(BaseDelegatingEstimator):
         self.best_candidate_name = best_candidate_name
         if self.verbose:
             print('Selected best candidate: %s' % self.best_candidate_name)
-        self.best_estimator = best_candidate
         self._create_delegates('best_estimator', non_fit_methods + sym_methods)
-        del self.best_estimator
         return best_output
         
     def fit(self, X, y=None, sample_weight=None, exposure=None):

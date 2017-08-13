@@ -509,7 +509,14 @@ class _BasicDelegateDescriptor(object):
         clone_name = delegate_name + '_'
         
         # If the clone doesn't exist, it needs to be created by this call
-        if not hasattr(obj, clone_name):
+        if hasattr(obj, clone_name):
+            delegate = getattr(obj, clone_name)
+            method = getattr(delegate, self.method_name)
+            spec = getargspec(method)
+            def out(*args, **kwargs):
+                return method(*args, **kwargs)
+            out._spec = spec
+        elif hasattr(obj, delegate_name):
             delegate = getattr(obj, delegate_name)
             method = getattr(delegate, self.method_name)
             spec = getargspec(method)
@@ -518,12 +525,7 @@ class _BasicDelegateDescriptor(object):
                 return obj
             out._spec = spec
         else:
-            delegate = getattr(obj, clone_name)
-            method = getattr(delegate, self.method_name)
-            spec = getargspec(method)
-            def out(*args, **kwargs):
-                return method(*args, **kwargs)
-            out._spec = spec
+            raise KeyError('Delegate %s (or %s) does not exist.' % (delegate_name, clone_name))
 #             out = lambda *args, **kwargs: method(*args, **kwargs)
 #             out = method
         update_wrapper(out, self.fn)
@@ -571,9 +573,9 @@ class BaseDelegatingEstimator(with_metaclass(DelegatingMetaClass, STSimpleEstima
     def _create_delegates(self, name, method_names):
         if not hasattr(self, '_delegates'):
             self._delegates = {}
-        delegate_ = getattr(self, name)
-        methods = [method for method in method_names if callable(getattr(delegate_, method, None))]
-        for method in methods:
+#         delegate_ = getattr(self, name)
+#         methods = [method for method in method_names if callable(getattr(delegate_, method, None))]
+        for method in method_names:
             self._delegates[method] = name
 #             def fn(obj):
 #                 pass

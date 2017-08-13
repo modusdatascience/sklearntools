@@ -1,4 +1,5 @@
-from .sklearntools import STSimpleEstimator, fit_predict, shrinkd, LinearCombination
+from .sklearntools import fit_predict, shrinkd, LinearCombination, \
+    non_fit_methods, sym_methods, BaseDelegatingEstimator
 from sklearn.base import clone
 from toolz.dicttoolz import valmap
 from .line_search import golden_section_search, zoom_search, zoom
@@ -58,7 +59,7 @@ class SmoothQuantileLossFunction(RegressionLossFunction):
     def _update_terminal_region(self, *args, **kwargs):
         raise NotImplementedError()
     
-class GradientBoostingEstimator(STSimpleEstimator):
+class GradientBoostingEstimator(BaseDelegatingEstimator):
     def __init__(self, base_estimator, loss_function, max_step_size=1., n_estimators=100):
         self.base_estimator = base_estimator
         self.loss_function = loss_function
@@ -113,6 +114,7 @@ class GradientBoostingEstimator(STSimpleEstimator):
         self.losses_ = losses
         self.score_ = (self.initial_loss_ - loss) / self.initial_loss_
         self.estimator_ = LinearCombination(self.estimators_, self.coefficients_)
+        self._create_delegates('estimator', list(set(non_fit_methods + sym_methods) - set(['score'])))
     
     def score(self, X, y, sample_weight=None, exposure=None):
         partial_arguments = self._process_args(y=y, sample_weight=sample_weight, exposure=exposure)
@@ -124,8 +126,8 @@ class GradientBoostingEstimator(STSimpleEstimator):
         initial_loss = loss_function(initial_prediction)
         return (initial_loss - loss) / initial_loss
         
-    def predict(self, X, exposure=None):
-        return self.estimator_.predict(X=X, exposure=exposure)
+#     def predict(self, X, exposure=None):
+#         return self.estimator_.predict(X=X, exposure=exposure)
 #         predict_args = self._process_args(X=X,exposure=exposure)
 #         return sum(shrinkd(1, coef * est.predict(**valmap(shrinkd(1),predict_args))) for est, coef in zip(self.estimators_, self.coefficients_))
 #         

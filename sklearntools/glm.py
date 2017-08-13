@@ -2,8 +2,8 @@
 import statsmodels.api
 import statsmodels.genmod.families.family
 import numpy as np
-from sklearn.metrics import r2_score
 from sklearntools import STSimpleEstimator
+from statsmodels.genmod.families.links import log
 
 class GLM(STSimpleEstimator):
     '''
@@ -180,14 +180,17 @@ class GLM(STSimpleEstimator):
         
 class GLMFamily(GLM):
     family = NotImplemented
+    args = tuple()
+    kwargs = dict()
     def __init__(self, add_constant=True):
-        super(GLMFamily,self).__init__(family=self.__class__.family(), add_constant=add_constant)
+        super(GLMFamily,self).__init__(family=self.__class__.family(*self.__class__.args, **self.__class__.kwargs), add_constant=add_constant)
 
 class BinomialRegressor(GLMFamily):
     family = statsmodels.genmod.families.family.Binomial
 
 class GammaRegressor(GLMFamily):
     family = statsmodels.genmod.families.family.Gamma
+    args = (log,)
     
 class GaussianRegressor(GLMFamily):
     family = statsmodels.genmod.families.family.Gaussian
