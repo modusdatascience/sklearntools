@@ -10,6 +10,7 @@ from operator import __sub__, __lt__
 from toolz.itertoolz import sliding_window
 from itertools import starmap
 from toolz.functoolz import flip, curry
+from sklearn.exceptions import NotFittedError
 
 def log_one_plus_exp_x(x):
     lower = -10.
@@ -176,3 +177,39 @@ class GradientBoostingEstimator(BaseDelegatingEstimator):
         initial_loss = loss_function(initial_prediction)
         return (initial_loss - loss) / initial_loss
     
+    def predict(self, X, exposure=None):
+        if not hasattr(self, 'estimator_'):
+            raise NotFittedError()
+        pred_args = self._process_args(X=X, exposure=exposure)
+        score = self.estimator_.predict(**pred_args)
+        if hasattr(self.loss_function, '_score_to_decision'):
+            return self.loss_function._score_to_decision(score)
+        else:
+            return score
+    
+    def predict_proba(self, X, exposure=None):
+        if not hasattr(self, 'estimator_'):
+            raise NotFittedError()
+        if hasattr(self.loss_function, '_score_to_proba'):
+            pred_args = self._process_args(X=X, exposure=exposure)
+            score = self.estimator_.predict(**pred_args)
+            return self.loss_function._score_to_proba(score)
+        else:
+            raise AttributeError()
+    
+    def decision_function(self, X, exposure=None):
+        if not hasattr(self.loss_function, '_score_to_decision'):
+            raise AttributeError()
+        if not hasattr(self, 'estimator_'):
+            raise NotFittedError()
+        pred_args = self._process_args(X=X, exposure=exposure)
+        score = self.estimator_.predict(**pred_args)
+        return score
+    
+    @property
+    def _estimator_type(self):
+        if hasattr(self.loss_function, '_score_to_decision'):
+            return 'classifier'
+        else:
+            return 'regressor'
+        
