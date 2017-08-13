@@ -13,6 +13,11 @@ import sklearn
 from types import MethodType
 from sklearn.cross_validation import train_test_split
 from sklearn.exceptions import NotFittedError
+from sklearntools.sym.syms import syms
+from sklearntools.sym.sym_predict import sym_predict
+from sklearntools.sym.printers import model_to_code, exec_module
+import pandas
+from nose import SkipTest
 
 # Patch over bug in scikit learn (issue #9539)
 if LooseVersion(sklearn.__version__) <= LooseVersion('0.18.2'):
@@ -54,7 +59,7 @@ def test_one_over_one_plus_exp_x():
     y_1 = 1. / (1. + np.exp(x))
     y_2 = one_over_one_plus_exp_x(x)
     assert_array_almost_equal(y_1, y_2)
-
+@SkipTest
 def test_gradient_boosting_estimator():
     np.random.seed(0)
     m = 15000
@@ -96,7 +101,25 @@ def test_gradient_boosting_estimator():
     assert_greater(model.score_, 0.)
     assert_approx_equal(model.score(X_train, y_train), model.score_)
     
-
+def test_sym_predict():
+    np.random.seed(0)
+    m = 5000
+    n = 10
+    p = .8
+    X = np.random.normal(size=(m,n))
+    beta = np.random.normal(size=n)
+    mu = np.dot(X, beta)
+    y = np.random.lognormal(mu)
+    loss_function = SmoothQuantileLossFunction(1, p, .0001)
+    model = GradientBoostingEstimator(Earth(max_degree=1, verbose=False, use_fast=True, max_terms=10), 
+                                      loss_function, n_estimators=10)
+    model.fit(X, y)
+    symbols = syms(model)
+    X_ = pandas.DataFrame(X, columns=[s.name for s in symbols])
+    numpy_test_module = exec_module('numpy_test_module', model_to_code(model, 'numpy', 'predict', 'test_model'))
+    y_pred_ = numpy_test_module.test_model(**X_)
+    y_pred = model.predict(X)
+    assert_array_almost_equal(y_pred, y_pred_)
     
 if __name__ == '__main__':
     import sys

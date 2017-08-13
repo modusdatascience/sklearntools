@@ -17,12 +17,14 @@ from sym.sym_predict_proba import sym_predict_proba
 import pandas
 from sympy.functions.elementary.miscellaneous import Max, Min
 from sympy.core.numbers import RealNumber
-from itertools import chain
+from itertools import chain, starmap
 from sym.sym_transform import sym_transform
 from sympy.core.symbol import Symbol
 from . import __version__
 from toolz.functoolz import curry
 from sklearn.exceptions import NotFittedError
+from operator import __add__, __mul__
+from nose.tools import assert_equal
 # 
 # def if_delegate_has_method(*args, **kwargs):
 #     return decorator(sklearn_if_delegate_has_method(*args, **kwargs))
@@ -459,6 +461,19 @@ class LinearCombination(STSimpleEstimator, MetaEstimatorMixin):
     
     def fit(self, X, y=None, sample_weight=None, exposure=None):
         raise NotImplementedError('Linear combinations should only be created after fitting.')
+    
+    def syms(self):
+        result = syms(self.estimators[-1])
+        for est in self.estimators:
+            try:
+                check = syms(est)
+            except AttributeError:
+                continue
+            assert_equal(result, check)
+        return result
+    
+    def sym_predict(self):
+        return reduce(__add__, starmap(__mul__, zip(self.coefficients, map(sym_predict, self.estimators))))
     
     def predict(self, X, exposure=None):
         data = self._process_args(X=X, exposure=exposure)

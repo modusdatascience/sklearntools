@@ -1,13 +1,9 @@
 import numpy as np
 from sklearntools.earth import Earth
-from sklearn.linear_model.logistic import LogisticRegression
-from sklearntools.calibration import ProbaPredictingEstimator,\
-    ThresholdClassifier
 import pandas
-from sklearntools.sym.printers import model_to_code
+from sklearntools.sym.printers import model_to_code, exec_module
 from sklearntools.sym.sym_predict import sym_predict
 from numpy.ma.testutils import assert_array_almost_equal
-import imp
 import execjs
 from sklearntools.calibration import LogTransformer,\
     ResponseTransformingEstimator, CalibratedEstimatorCV, \
@@ -19,12 +15,6 @@ from nose.tools import assert_almost_equal
 from sklearntools.sym.syms import syms
 from sklearn.ensemble.gradient_boosting import GradientBoostingClassifier
 from sklearntools.sym.sym_predict_proba import sym_predict_proba
-
-def exec_module(name, code):
-    module = imp.new_module(name)
-    exec code in module.__dict__
-    return module
-
 
 def test_gradient_boosting_classifier_export():
     np.random.seed(1)

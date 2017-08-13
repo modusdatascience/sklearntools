@@ -10,6 +10,12 @@ from .parts import trim_parts, assert_parts_are_composable
 from .sym_predict_parts import sym_predict_parts
 from .sym_transform_parts import sym_transform_parts
 from .sym_predict_proba_parts import sym_predict_proba_parts
+import imp
+
+def exec_module(name, code):
+    module = imp.new_module(name)
+    exec code in module.__dict__
+    return module
 
 class STJavaScriptPrinter(JavascriptCodePrinter):
     def _print_Max(self, expr):
