@@ -125,5 +125,4 @@ class GradientBoostingEstimator(BaseDelegatingEstimator):
         initial_prediction = shrinkd(1, self.coefficients_[0] * self.estimators_[0].predict(**predict_arguments))
         initial_loss = loss_function(initial_prediction)
         return (initial_loss - loss) / initial_loss
-        
-            
+    

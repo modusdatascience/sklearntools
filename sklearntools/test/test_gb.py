@@ -3,7 +3,7 @@ from sklearntools.gb import GradientBoostingEstimator,\
     SmoothQuantileLossFunction, log_one_plus_exp_x, one_over_one_plus_exp_x
 from numpy.testing.utils import assert_approx_equal, assert_array_almost_equal
 from sklearntools.earth import Earth
-from nose.tools import assert_less, assert_greater
+from nose.tools import assert_less, assert_greater, assert_raises
 from sklearn.ensemble.gradient_boosting import GradientBoostingRegressor,\
     QuantileLossFunction
 from sklearn.ensemble.bagging import BaggingRegressor
@@ -12,6 +12,7 @@ from distutils.version import LooseVersion
 import sklearn
 from types import MethodType
 from sklearn.cross_validation import train_test_split
+from sklearn.exceptions import NotFittedError
 
 # Patch over bug in scikit learn (issue #9539)
 if LooseVersion(sklearn.__version__) <= LooseVersion('0.18.2'):
@@ -69,6 +70,8 @@ def test_gradient_boosting_estimator():
     q_loss = QuantileLossFunction(1, p)
     model = GradientBoostingEstimator(BaggingRegressor(Earth(max_degree=2, verbose=False, use_fast=True, max_terms=10)), 
                                       loss_function, n_estimators=50)
+    assert_raises(NotFittedError, lambda : model.predict(X_train))
+    
     model.fit(X_train, y_train)
     prediction = model.predict(X_test)
     model2 = GradientBoostingRegressor(loss='quantile', alpha=p)

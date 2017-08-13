@@ -22,6 +22,7 @@ from sym.sym_transform import sym_transform
 from sympy.core.symbol import Symbol
 from . import __version__
 from toolz.functoolz import curry
+from sklearn.exceptions import NotFittedError
 # 
 # def if_delegate_has_method(*args, **kwargs):
 #     return decorator(sklearn_if_delegate_has_method(*args, **kwargs))
@@ -504,6 +505,8 @@ class _BasicDelegateDescriptor(object):
                     delegate_name = obj.__class__._class_delegates[self.method_name]
                 except KeyError:
                     raise AttributeError()
+            except AttributeError:
+                raise NotFittedError()
         else:
             delegate_name = self.delegate_name
         clone_name = delegate_name + '_'
@@ -525,9 +528,7 @@ class _BasicDelegateDescriptor(object):
                 return obj
             out._spec = spec
         else:
-            raise KeyError('Delegate %s (or %s) does not exist.' % (delegate_name, clone_name))
-#             out = lambda *args, **kwargs: method(*args, **kwargs)
-#             out = method
+            raise NotFittedError()
         update_wrapper(out, self.fn)
         return out
 
@@ -566,7 +567,8 @@ non_fit_methods = ['predict', 'score', 'predict_proba', 'decision_function',
 predict_methods = ['predict', 'predict_proba', 'decision_function', 
                          'predict_log_proba']
 sym_methods = ['syms', 'sym_predict', 'sym_transform', 
-               'sym_predict_parts', 'sym_transform_parts', 'sym_predict_proba']
+               'sym_predict_parts', 'sym_transform_parts', 'sym_predict_proba',
+               'sym_predict_proba_parts']
 
 
 class BaseDelegatingEstimator(with_metaclass(DelegatingMetaClass, STSimpleEstimator, MetaEstimatorMixin)):
@@ -623,6 +625,10 @@ class BaseDelegatingEstimator(with_metaclass(DelegatingMetaClass, STSimpleEstima
         pass
     
     @delegate
+    def sym_predict_proba(self):
+        pass
+    
+    @delegate
     def sym_predict_parts(self):
         pass
     
@@ -631,8 +637,9 @@ class BaseDelegatingEstimator(with_metaclass(DelegatingMetaClass, STSimpleEstima
         pass
     
     @delegate
-    def sym_predict_proba(self):
+    def sym_predict_proba_parts(self):
         pass
+    
 
 class DelegatingEstimator(BaseDelegatingEstimator):
     _delegates = {'fit': 'estimator', 'predict': 'estimator', 'score': 'estimator', 
