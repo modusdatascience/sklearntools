@@ -54,11 +54,11 @@ def sym_predict_log_odds_estimator(estimator):
 
 @register_syms(LossFunction)
 def syms_loss_function(loss):
-    return Symbol('x')
+    return [Symbol('x')]
 
 @register_sym_score_to_proba(BinomialDeviance)
 def sym_score_to_proba_binomial_deviance(loss):
-    return 1 / 1 + exp(-Symbol('x'))
+    return 1 / (1 + exp(-Symbol('x')))
 
 @register_sym_score_to_decision(BinomialDeviance)
 def sym_score_to_decision(loss):

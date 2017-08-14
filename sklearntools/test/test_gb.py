@@ -71,7 +71,19 @@ def test_gradient_boosting_estimator_with_binomial_deviance_loss():
     assert_greater(np.sum(model.predict(X)==y) / float(y.shape[0]), .90)
     assert_true(np.all(0<=model.predict_proba(X)))
     assert_true(np.all(1>=model.predict_proba(X)))
-
+    symbols = syms(model)
+    X_ = pandas.DataFrame(X, columns=[s.name for s in symbols])
+    numpy_test_module = exec_module('numpy_test_module', model_to_code(model, 'numpy', 'predict', 'test_model'))
+    y_pred_ = numpy_test_module.test_model(**X_)
+    y_pred = model.predict(X)
+    assert_array_almost_equal(y_pred, y_pred_)
+    
+    numpy_test_module = exec_module('numpy_test_module', model_to_code(model, 'numpy', 'predict_proba', 'test_model'))
+    y_pred_ = numpy_test_module.test_model(**X_)
+    y_pred = model.predict_proba(X)[:,1]
+    assert_array_almost_equal(y_pred, y_pred_)
+    
+    
 def test_gradient_boosting_estimator_with_smooth_quantile_loss():
     np.random.seed(0)
     m = 15000
