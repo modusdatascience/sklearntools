@@ -16,7 +16,7 @@ from sklearntools.sym.syms import syms
 from sklearn.ensemble.gradient_boosting import GradientBoostingClassifier
 from sklearntools.sym.sym_predict_proba import sym_predict_proba
 
-def test_gradient_boosting_classifier_export():
+def test_sklearn_gradient_boosting_classifier_export():
     np.random.seed(1)
     
     # Create some data

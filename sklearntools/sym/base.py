@@ -1,3 +1,4 @@
+from toolz.functoolz import curry
 
 def call_method_or_dispatch(method_name, dispatcher):
     def _call_method_or_dispatch(estimator, *args, **kwargs):
@@ -27,7 +28,9 @@ def fallback(*args):
     return _fallback
 
 def create_registerer(dispatcher, name):
+    @curry
     def _register(cls, function):
         dispatcher[cls] = function
+        return function
     _register.__name__ = name
     return _register
