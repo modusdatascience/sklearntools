@@ -6,7 +6,7 @@ from numpy.testing.utils import assert_approx_equal, assert_array_almost_equal
 from sklearntools.earth import Earth
 from nose.tools import assert_less, assert_greater, assert_raises, assert_true
 from sklearn.ensemble.gradient_boosting import GradientBoostingRegressor,\
-    QuantileLossFunction
+    QuantileLossFunction, BinomialDeviance
 from sklearn.ensemble.bagging import BaggingRegressor
 from sklearn.metrics.regression import r2_score
 from distutils.version import LooseVersion
@@ -18,6 +18,8 @@ from sklearntools.sym.syms import syms
 from sklearntools.sym.sym_predict import sym_predict
 from sklearntools.sym.printers import model_to_code, exec_module
 import pandas
+from sklearn.datasets.samples_generator import make_classification
+from nose import SkipTest
 
 # Patch over bug in scikit learn (issue #9539)
 if LooseVersion(sklearn.__version__) <= LooseVersion('0.18.2'):
@@ -60,7 +62,17 @@ def test_one_over_one_plus_exp_x():
     y_2 = one_over_one_plus_exp_x(x)
     assert_array_almost_equal(y_1, y_2)
 
-def test_gradient_boosting_estimator():
+def test_gradient_boosting_estimator_with_binomial_deviance_loss():
+    np.random.seed(0)
+    X, y = make_classification(n_classes=2)
+    loss_function = BinomialDeviance(2)
+    model = GradientBoostingEstimator(Earth(max_degree=2, use_fast=True, max_terms=10), loss_function)
+    model.fit(X, y)
+    assert_greater(np.sum(model.predict(X)==y) / float(y.shape[0]), .90)
+    assert_true(np.all(0<=model.predict_proba(X)))
+    assert_true(np.all(1>=model.predict_proba(X)))
+
+def test_gradient_boosting_estimator_with_smooth_quantile_loss():
     np.random.seed(0)
     m = 15000
     n = 10
