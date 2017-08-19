@@ -1,7 +1,8 @@
 import numpy as np
 from sklearntools.gb import GradientBoostingEstimator,\
     SmoothQuantileLossFunction, log_one_plus_exp_x, one_over_one_plus_exp_x,\
-    stop_after_n_iterations_without_improvement_over_threshold
+    stop_after_n_iterations_without_improvement_over_threshold,\
+    stop_after_n_iterations_without_percent_improvement_over_threshold
 from numpy.testing.utils import assert_approx_equal, assert_array_almost_equal
 from sklearntools.earth import Earth
 from nose.tools import assert_less, assert_greater, assert_raises, assert_true
@@ -99,7 +100,7 @@ def test_gradient_boosting_estimator_with_smooth_quantile_loss():
     q_loss = QuantileLossFunction(1, p)
     model = GradientBoostingEstimator(BaggingRegressor(Earth(max_degree=2, verbose=False, use_fast=True, max_terms=10)), 
                                       loss_function, n_estimators=50, 
-                                      stopper=stop_after_n_iterations_without_improvement_over_threshold(2, 100.), verbose=False)
+                                      stopper=stop_after_n_iterations_without_percent_improvement_over_threshold(2, .1), verbose=False)
     assert_raises(NotFittedError, lambda : model.predict(X_train))
     
     model.fit(X_train, y_train)

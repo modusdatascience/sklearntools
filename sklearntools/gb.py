@@ -70,12 +70,20 @@ class SmoothQuantileLossFunction(RegressionLossFunction):
 def never_stop_early(**kwargs):
     return False
 
-def stop_after_n_iterations_without_improvement_over_threshold(n, threshold=0.):
+@curry
+def stop_after_n_iterations_without_stat_improvement_over_threshold(stat, n, threshold=0.):
     def _stop_after_n_iterations_without_improvement(losses_cv, **kwargs):
         if len(losses_cv) <= n:
             return False
-        return all(map(curry(__lt__)(-threshold), starmap(flip(__sub__), sliding_window(2, losses_cv[-(n+1):]))))
+        return all(map(curry(__lt__)(-threshold), starmap(stat, sliding_window(2, losses_cv[-(n+1):]))))
     return _stop_after_n_iterations_without_improvement
+
+stop_after_n_iterations_without_improvement_over_threshold = stop_after_n_iterations_without_stat_improvement_over_threshold(flip(__sub__))
+
+def percent_reduction(before, after):
+    return 100*(after - before) / float(before)
+
+stop_after_n_iterations_without_percent_improvement_over_threshold = stop_after_n_iterations_without_stat_improvement_over_threshold(percent_reduction)
 
 class GradientBoostingEstimator(BaseDelegatingEstimator):
     def __init__(self, base_estimator, loss_function, max_step_size=1., n_estimators=100,
@@ -168,7 +176,7 @@ class GradientBoostingEstimator(BaseDelegatingEstimator):
         self.losses_cv_ = losses_cv
         self.score_ = (self.initial_loss_ - loss) / self.initial_loss_
         self.estimator_ = LinearCombination(self.estimators_, self.coefficients_)
-        self._create_delegates('estimator', ['syms', 'input_size'])
+        self._create_delegates('estimator', ['syms'])
     
     def score(self, X, y, sample_weight=None, exposure=None):
         partial_arguments = self._process_args(y=y, sample_weight=sample_weight, exposure=exposure)
