@@ -1,5 +1,4 @@
-from .sklearntools import fit_predict, shrinkd, LinearCombination, \
-    non_fit_methods, sym_methods, BaseDelegatingEstimator
+from .sklearntools import fit_predict, shrinkd, LinearCombination, BaseDelegatingEstimator
 from sklearn.base import clone
 from toolz.dicttoolz import valmap
 from .line_search import golden_section_search, zoom_search, zoom
@@ -169,7 +168,7 @@ class GradientBoostingEstimator(BaseDelegatingEstimator):
         self.losses_cv_ = losses_cv
         self.score_ = (self.initial_loss_ - loss) / self.initial_loss_
         self.estimator_ = LinearCombination(self.estimators_, self.coefficients_)
-        self._create_delegates('estimator', list(set(non_fit_methods + sym_methods) - set(['score'])))
+        self._create_delegates('estimator', ['syms', 'input_size'])
     
     def score(self, X, y, sample_weight=None, exposure=None):
         partial_arguments = self._process_args(y=y, sample_weight=sample_weight, exposure=exposure)

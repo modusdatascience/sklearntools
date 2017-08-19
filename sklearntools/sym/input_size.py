@@ -9,11 +9,11 @@ def input_size_from_coef(estimator):
     return n_inputs
 
 def input_size_from_n_features_(estimator):
-    assert hasattr(estimator, 'n_features_')
+    assert hasattr(estimator, 'n_features_'), str(estimator)
     return estimator.n_features_
 
 def input_size_from_n_features(estimator):
-    assert hasattr(estimator, 'n_features')
+    assert hasattr(estimator, 'n_features'), str(estimator)
     return estimator.n_features
 
 input_size_dispatcher = {
