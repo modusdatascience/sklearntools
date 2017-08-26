@@ -177,6 +177,7 @@ class GradientBoostingEstimator(BaseDelegatingEstimator):
         self.score_ = (self.initial_loss_ - loss) / self.initial_loss_
         self.estimator_ = LinearCombination(self.estimators_, self.coefficients_)
         self._create_delegates('estimator', ['syms'])
+        return self
     
     def score(self, X, y, sample_weight=None, exposure=None):
         partial_arguments = self._process_args(y=y, sample_weight=sample_weight, exposure=exposure)
