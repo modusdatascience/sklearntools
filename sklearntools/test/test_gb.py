@@ -1,7 +1,6 @@
 import numpy as np
 from sklearntools.gb import GradientBoostingEstimator,\
     SmoothQuantileLossFunction, log_one_plus_exp_x, one_over_one_plus_exp_x,\
-    stop_after_n_iterations_without_improvement_over_threshold,\
     stop_after_n_iterations_without_percent_improvement_over_threshold
 from numpy.testing.utils import assert_approx_equal, assert_array_almost_equal
 from sklearntools.earth import Earth
@@ -10,36 +9,13 @@ from sklearn.ensemble.gradient_boosting import GradientBoostingRegressor,\
     QuantileLossFunction, BinomialDeviance
 from sklearn.ensemble.bagging import BaggingRegressor
 from sklearn.metrics.regression import r2_score
-from distutils.version import LooseVersion
-import sklearn
-from types import MethodType
 from sklearn.cross_validation import train_test_split
 from sklearn.exceptions import NotFittedError
 from sklearntools.sym.syms import syms
-from sklearntools.sym.sym_predict import sym_predict
 from sklearntools.sym.printers import model_to_code, exec_module
 import pandas
 from sklearn.datasets.samples_generator import make_classification
-from nose import SkipTest
 
-# Patch over bug in scikit learn (issue #9539)
-if LooseVersion(sklearn.__version__) <= LooseVersion('0.18.2'):
-    def __call__(self, y, pred, sample_weight=None):
-        pred = pred.ravel()
-        diff = y - pred
-        alpha = self.alpha
-    
-        mask = y > pred
-        if sample_weight is None:
-            loss = (alpha * diff[mask].sum() -
-                    (1.0 - alpha) * diff[~mask].sum()) / y.shape[0]
-        else:
-            loss = ((alpha * np.sum(sample_weight[mask] * diff[mask]) -
-                    (1.0 - alpha) * np.sum(sample_weight[~mask] * diff[~mask])) /
-                    sample_weight.sum())
-        return loss
-    QuantileLossFunction.__call__ = MethodType(__call__, None, QuantileLossFunction)
-    
 def test_smooth_quantile_loss_function():
     np.random.seed(0)
     n = 1000
