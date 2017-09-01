@@ -92,6 +92,8 @@ def growd(d, x):
 
 @curry
 def shrinkd(d, x):
+    if isinstance(x, pandas.DataFrame):
+        return x
     shape = x.shape
     l = len(shape)
     if l <= d:
@@ -1105,7 +1107,23 @@ class MultiEstimator(STSimpleEstimator, MetaEstimatorMixin):
             result = estimator.predict_log_proba(**args)
             results.append(result)
         return np.array(results, axis=1)
+
+class DecisionPathTransformer(DelegatingEstimator):
+    '''
+    Just overrides transform to use decision_path instead.  Useful for pipelines.
+    '''
+    def __init__(self, estimator):
+        self.estimator = estimator
+        self._create_delegates('estimator', standard_methods)
     
+    def transform(self, X, exposure=None):
+        args = {'X': X}
+        if exposure is not None:
+            args['exposure'] = exposure
+        result = self.estimator.decision_path(**args).todense()
+        if len(result.shape) == 1:
+            result = result[:, None]
+        return result
     
 # class UnionEstimator(STSimpleEstimator, MetaEstimatorMixin):
 #     def __init__(self, estimators):
