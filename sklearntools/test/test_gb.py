@@ -76,7 +76,7 @@ def test_gradient_boosting_estimator_with_smooth_quantile_loss():
     q_loss = QuantileLossFunction(1, p)
     model = GradientBoostingEstimator(BaggingRegressor(Earth(max_degree=2, verbose=False, use_fast=True, max_terms=10)), 
                                       loss_function, n_estimators=150, 
-                                      stopper=stop_after_n_iterations_without_percent_improvement_over_threshold(2, .05), verbose=True)
+                                      stopper=stop_after_n_iterations_without_percent_improvement_over_threshold(3, .01), verbose=True)
     assert_raises(NotFittedError, lambda : model.predict(X_train))
     
     model.fit(X_train, y_train)
