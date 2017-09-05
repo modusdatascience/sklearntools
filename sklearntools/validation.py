@@ -1,22 +1,26 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from sklearn.utils import resample
-from sklearn.metrics.ranking import roc_curve, auc
+from sklearn.metrics.ranking import roc_curve, auc as sk_auc
 
 def plot_roc(observed, predicted, name, iterations=100, **kwargs):
     fpr, tpr, thresholds = roc_curve(observed, predicted)
-    roc_auc = auc(fpr, tpr)
+    roc_auc = sk_auc(fpr, tpr)
     bsauc = []
     for _ in range(iterations):
         obs, pred = resample(observed, predicted)
         fpr_, tpr_, thresholds = roc_curve(obs, pred)
-        bsauc.append(auc(fpr_, tpr_))
+        bsauc.append(sk_auc(fpr_, tpr_))
     bsauc = np.asarray(bsauc)
     lower = np.percentile(bsauc, 2.5)
     upper = np.percentile(bsauc, 97.5)
     plt.plot(fpr, tpr, label='Model %s (AUC = %0.3f, 95%% CI %0.3f-%0.3f)' % (name, roc_auc, lower, upper), **kwargs)
     plt.plot([0, 1], [0, 1], 'k--')
     plt.legend(loc=0)
+
+def auc(observed, predicted):
+    fpr, tpr, _ = roc_curve(observed, predicted)
+    return sk_auc(fpr, tpr)
 
 class MovingWindowStatistic(object):
     def __init__(self, window_size, stat):
