@@ -8,6 +8,7 @@ from sym.sym_predict import sym_predict
 from sym.syms import syms
 from sym.sym_predict_parts import sym_predict_parts
 from sym.sym_transform_parts import sym_transform_parts
+from .sklearntools import shrinkd
 
 class CrossValidatingEstimator(BaseDelegatingEstimator):
     def __init__(self, estimator, metric=None, cv=2, n_jobs=1, verbose=0, 
@@ -52,7 +53,7 @@ class CrossValidatingEstimator(BaseDelegatingEstimator):
             if hasattr(self.cv, 'split'):
                 cv = self.cv.split(X, y)
             else:
-                cv = check_cv(self.cv, X=X, y=y, classifier=is_classifier(self.estimator))
+                cv = check_cv(self.cv, X=X, y=shrinkd(1,np.asarray(y)), classifier=is_classifier(self.estimator))
                 
         # Do the cross validation fits
         cv_fits = parallel(delayed(_fit_and_predict)(clone(self.estimator), fit_args, train, test) for train, test in cv)
