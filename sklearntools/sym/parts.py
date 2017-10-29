@@ -1,4 +1,4 @@
-from operator import add, or_
+from operator import add, or_, __or__
 from itertools import compress, chain
 
 def assert_parts_are_composable(parts):
@@ -39,7 +39,7 @@ def assemble_parts_into_expressions(parts):
 def trim_parts(parts, top=True):
     inputs, expressions, target = parts
     if target is None:
-        used_symbols = reduce(add, map(lambda x: x.free_symbols, expressions))
+        used_symbols = reduce(__or__, map(lambda x: x.free_symbols, expressions))
         result, index_result = ([inp for inp in inputs if inp in used_symbols], expressions, None), [inp in used_symbols for inp in inputs]
     else:
         target_result, index = trim_parts(target, top=False)

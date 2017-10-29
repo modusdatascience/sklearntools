@@ -25,6 +25,7 @@ from toolz.functoolz import curry
 from sklearn.exceptions import NotFittedError
 from operator import __add__, __mul__
 from nose.tools import assert_equal
+from pandas.core.indexing import IndexingError
 # 
 # def if_delegate_has_method(*args, **kwargs):
 #     return decorator(sklearn_if_delegate_has_method(*args, **kwargs))
@@ -109,7 +110,11 @@ def shrinkd(d, x):
                 slice_args.append(slice(None))
         return x.__getitem__(slice_args)
          
-        
+def safe_column_select(data, col):
+    if hasattr(data, 'loc'):
+        return data.loc[:, col]
+    else:
+        return data[:, col]
 
 def _subset(data, idx):
     if len(data.shape) == 1:
@@ -134,7 +139,16 @@ def safe_assign_subset(arr, idx, value):
             arr[idx, :] = value.reshape(arr[idx, :].shape)
         except:
             arr.flat[idx] = value
-    
+    except IndexingError:
+        arr[idx] = value
+        
+def safe_assign_column(arr, col, value):
+    if hasattr(arr, 'loc'):
+        arr.loc[:, col] = value
+    else:
+        arr[:, col] = value
+
+
 def safe_column_names(arr):
     if hasattr(arr, 'columns'):
         return list(arr.columns)
@@ -145,6 +159,13 @@ def safe_column_names(arr):
     else:
         raise ValueError()
 
+@curry
+def clean_column_name(xlabels, col):
+    if isinstance(col, int):
+        return xlabels[col]
+    else:
+        return col
+    
 def _fit_and_score(estimator, data, scorer, train, test):
     train_data = _subset_data(data, train)
     estimator_ = clone(estimator).fit(**train_data)

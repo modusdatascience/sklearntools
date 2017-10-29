@@ -60,7 +60,6 @@ def test_gradient_boosting_estimator_with_binomial_deviance_loss():
     y_pred = model.predict_proba(X)[:,1]
     assert_array_almost_equal(y_pred, y_pred_)
     
-    
 def test_gradient_boosting_estimator_with_smooth_quantile_loss():
     np.random.seed(0)
     m = 15000

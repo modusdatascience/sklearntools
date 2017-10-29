@@ -1,4 +1,7 @@
 from toolz.functoolz import curry
+from sympy.core.function import Function
+
+NAN = Function('NAN')
 
 def call_method_or_dispatch(method_name, dispatcher):
     def _call_method_or_dispatch(estimator, *args, **kwargs):

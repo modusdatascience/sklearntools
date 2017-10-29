@@ -30,6 +30,9 @@ class STJavaScriptPrinter(JavascriptCodePrinter):
     def _print_Missing(self, expr):
         return 'missing(' + ','.join(self._print(a) for a in expr.args) + ')'
     
+    def _print_NAN(self, expr):
+        return 'NaN'
+    
 javascript_template_filename = os.path.join(resources, 'javascript_template.mako.js')
 with open(javascript_template_filename) as infile:
     javascript_template = Template(infile.read())
@@ -60,6 +63,9 @@ class STNumpyPrinter(NumPyPrinter):
 
     def _print_Missing(self, expr):
         return 'isnan(' + ','.join(self._print(a) for a in expr.args) + ').astype(float)'
+    
+    def _print_NAN(self, expr):
+        return 'nan'
     
 numpy_template_filename = os.path.join(resources, 'numpy_template.mako.py')
 with open(numpy_template_filename) as infile:
@@ -97,6 +103,9 @@ class STPythonPrinter(PythonPrinter):
 
     def _print_Missing(self, expr):
         return 'missing(' + ','.join(self._print(i) for i in expr.args) + ')'
+    
+    def _print_NAN(self, expr):
+        return 'float(\'nan\')'
 
 python_template_filename = os.path.join(resources, 'python_template.mako.py')
 with open(python_template_filename) as infile:
