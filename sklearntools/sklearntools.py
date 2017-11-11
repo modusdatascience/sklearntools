@@ -44,12 +44,8 @@ def safe_call(fn, args):
         return fn(**args)
     else:
         safe_args = {arg: args[arg] for arg in spec.args[1:] if arg in args}
-        try:
-            return fn(**safe_args)
-        except:
-            1+1
-            return fn(**safe_args)
-        
+        return fn(**safe_args)
+
 def safer_call(fn, *args, **kwargs):
     kwargs = kwargs.copy()
     if hasattr(fn, '_spec'):
@@ -109,7 +105,18 @@ def shrinkd(d, x):
                 hit = True
                 slice_args.append(slice(None))
         return x.__getitem__(slice_args)
-         
+
+def safe_rows_select(data, rows):
+    if hasattr(data, 'loc'):
+        if len(data.shape) > 1:
+            return data.loc[rows,:]
+        else:
+            return data.loc[rows]    
+    elif len(data.shape) > 1:
+        return data[rows, :]
+    else:
+        return data[rows]
+
 def safe_column_select(data, col):
     if hasattr(data, 'loc'):
         return data.loc[:, col]

@@ -19,6 +19,8 @@ from sympy.functions.elementary.exponential import log
 from sympy.functions.elementary.piecewise import Piecewise
 from sympy.core.numbers import RealNumber
 from sympy.functions.elementary.miscellaneous import Max
+from .sklearntools import shrinkd
+from sklearn.isotonic import IsotonicRegression
 
 # def _fit_and_predict(estimator, X, y, train, test, sample_weight=None, exposure=None):
 #     '''
@@ -229,12 +231,23 @@ class HazardToRiskEstimator(STSimpleEstimator, MetaEstimatorMixin):
     def decision_function(self, X, exposure=None):
         return self.estimator_.decision_function(self._preprocess_x(X, exposure))
 
+class IsotonicRegressor(IsotonicRegression):
+    def fit(self, X, y, *args, **kwargs):
+        return IsotonicRegression.fit(self, shrinkd(1,X), shrinkd(1,np.asarray(y)), *args, **kwargs)
+    
+    def predict(self, X):
+        return IsotonicRegression.predict(self, T=X)
+    
+    def transform(self, X):
+        return IsotonicRegression.transform(self, T=X)
+    
 class PredictorTransformer(DelegatingEstimator):
     '''
     Just overrides transform to use predict.  Useful for pipelines.
     '''
-    def __init__(self, estimator):
+    def __init__(self, estimator, shrinkd=False):
         self.estimator = estimator
+        self.shrinkd = shrinkd
         self._create_delegates('estimator', standard_methods)
     
     def transform(self, X, exposure=None):
@@ -244,8 +257,11 @@ class PredictorTransformer(DelegatingEstimator):
         result = self.predict(**args)
         if len(result.shape) == 1:
             result = result[:, None]
-        return result
-    
+        if self.shrinkd:
+            return shrinkd(1, np.asarray(result))
+        else:
+            return result
+        
     def syms(self):
         return self.estimator_.syms()
     
