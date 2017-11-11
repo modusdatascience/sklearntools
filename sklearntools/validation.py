@@ -1,26 +1,143 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from sklearn.utils import resample
-from sklearn.metrics.ranking import roc_curve, auc as sk_auc
+from sklearn.metrics.ranking import roc_curve as sklearn_roc_curve, auc as sk_auc
+from toolz.functoolz import curry, flip
+from .sklearntools import safe_rows_select
+from operator import __eq__
+from toolz.itertoolz import sliding_window
+from itertools import starmap
+from scipy.stats.kde import gaussian_kde
 
-def plot_roc(observed, predicted, name, iterations=100, **kwargs):
-    fpr, tpr, thresholds = roc_curve(observed, predicted)
-    roc_auc = sk_auc(fpr, tpr)
+
+def tolerance_curve(observed, predicted):
+    absdiff = np.abs(observed - predicted)
+    absdiff.sort()
+    x = np.cumsum(absdiff)
+    return x, np.arange(0.,100.,100./float(len(absdiff)))
+
+def total_prediction_curve(observed, predicted):
+    order = np.argsort(predicted)
+    x = np.cumsum(predicted[order])
+    y = np.cumsum(observed[order])
+    return x, y
+
+def roc_curve(observed, predicted):
+    return tuple(sklearn_roc_curve(observed, predicted)[:2])
+
+def plot_curve_auc(curve, observed, predicted, name, iterations=100, normalize=False, **kwargs):
+    fpr, tpr = curve(observed, predicted)
+    if normalize:
+        factor = 1. / float(np.max(fpr) * np.max(tpr))
+    else:
+        factor = 1.
+    auc_ = factor*sk_auc(fpr, tpr)
     bsauc = []
     for _ in range(iterations):
         obs, pred = resample(observed, predicted)
-        fpr_, tpr_, thresholds = roc_curve(obs, pred)
-        bsauc.append(sk_auc(fpr_, tpr_))
-    bsauc = np.asarray(bsauc)
+        fpr_, tpr_ = curve(obs, pred)
+        if normalize:
+            factor = 1. / float(np.max(fpr_) * np.max(tpr_))
+        else:
+            factor = 1.
+        bsauc.append(factor*sk_auc(fpr_, tpr_))
+    bsauc = factor*np.asarray(bsauc)
     lower = np.percentile(bsauc, 2.5)
     upper = np.percentile(bsauc, 97.5)
-    plt.plot(fpr, tpr, label='Model %s (AUC = %0.3f, 95%% CI %0.3f-%0.3f)' % (name, roc_auc, lower, upper), **kwargs)
+    plt.plot(fpr, tpr, label='Model %s (AUC = %0.3f, 95%% CI %0.3f-%0.3f)' % (name, auc_, lower, upper), **kwargs)
     plt.plot([0, 1], [0, 1], 'k--')
     plt.legend(loc=0)
 
-def auc(observed, predicted):
-    fpr, tpr, _ = roc_curve(observed, predicted)
-    return sk_auc(fpr, tpr)
+plot_roc = curry(plot_curve_auc)(roc_curve)
+plot_tolerance = curry(plot_curve_auc)(tolerance_curve)
+plot_total_prediction = curry(plot_curve_auc)(total_prediction_curve)
+
+@curry
+def auc(curve, observed, predicted):
+    x, y = roc_curve(observed, predicted)
+    return sk_auc(x, y)
+
+roc_auc = auc(roc_curve)
+tolerance_auc = auc(tolerance_curve)
+total_prediction_auc = auc(total_prediction_curve)
+
+
+def density_plot(data):
+    density = gaussian_kde(data)
+    mu = np.mean(data)
+    sigma = np.std(data)
+    x = np.arange(mu - 3 * sigma, mu + 3 * sigma, 6 * sigma / 100.)
+    y = density(x)
+    plt.plot(x,y)
+    
+    
+def common_size(*args):
+    n_rows = map(lambda x: x.shape[0], args)
+    assert all(starmap(__eq__, sliding_window(2, n_rows)))
+    return n_rows[0]
+
+def order_by(order):
+    def order_by_(*args):
+        return map(flip(safe_rows_select)(order), args)
+    return order_by_
+
+def moving_window(window_size):
+    def moving_window_(*args):
+        n = common_size(*args)
+        window = np.arange(window_size, dtype=int)
+        for i in range(n - window_size):
+            yield tuple(map(flip(safe_rows_select)(window+i), *args))
+    return moving_window_
+
+def bin_window(n_bins):
+    def bin_window_(*args):
+        n = common_size(*args)
+        remainder = n % n_bins
+        quotient = n // n_bins
+        
+        start = 0
+        while start < n:
+            size = quotient
+            if remainder > 0:
+                size += 1
+                remainder -= 1
+            end = start + size
+            yield tuple(map(flip(safe_rows_select)(np.arange(start,end,dtype=int)), args))
+            start = end
+    return bin_window_
+    
+
+
+def plot_statistic(statistic, windower, orderer, covariate, observed, predicted, error_bar_lower=2.5, error_bar_upper=97.5, error_bar_n=500):
+    x = np.array(map(mean, windower(*orderer(covariate))))
+    y = np.array(list(starmap(statistic, windower(*orderer(observed, predicted)))))
+    y_lower = y - np.array(list(starmap(bootstrap(percentile(error_bar_lower), statistic, error_bar_n), windower(*orderer(observed, predicted)))))
+    y_upper = np.array(list(starmap(bootstrap(percentile(error_bar_upper), statistic, error_bar_n), windower(*orderer(observed, predicted))))) - y
+    y_err = np.concatenate([y_lower[:, None], y_upper[:, None]], axis=1)
+#     plt.plot(x, y, linestyle='')
+    plt.errorbar(x, y, yerr=y_err.T, marker='+', linestyle='')
+
+def plot_roc_auc_for_bins(n_bins, covariate, observed, predicted, error_bar_lower=2.5, error_bar_upper=97.5, error_bar_n=500):
+    return plot_statistic(roc_auc, bin_window(n_bins), order_by(np.argsort(covariate)), covariate, observed, 
+                          predicted, error_bar_lower, error_bar_upper, error_bar_n)
+    
+# def statistic_plot_values(x_stat, y_stat, x_args, y_args=None):
+#     x = np.array(map(x_stat, x_args))
+#     y = np.array(map(y_stat, y_args if y_args is not None else x_args))
+    
+    
+    
+    
+# def category_window(order, *args):
+#     pass
+# 
+# class MovingWindow(object):
+#     pass
+# 
+# class BinWindow(object):
+#     pass
+# 
+# class CategoryWindow(object):
 
 class MovingWindowStatistic(object):
     def __init__(self, window_size, stat):
@@ -238,8 +355,8 @@ def calibration_bin_plot(covariate, observed, predicted, obs_stat=mean, pred_sta
     error_bar_kwargs = {'marker':'+', 'linestyle':''}
     if observed_label is not None:
         error_bar_kwargs['label'] = observed_label
-    bin_error_bar_plot(covariate, observed, n_bins, quantile(.5), obs_stat, bootstrap(quantile(.5 - percent / 200.), obs_stat, n_bootstraps), 
-                       bootstrap(quantile(.5 + percent / 200.), obs_stat, n_bootstraps), error_bar_kwargs, linestyle='')
+        bin_error_bar_plot(covariate, observed, n_bins, quantile(.5), obs_stat, bootstrap(quantile(.5 - percent / 200.), obs_stat, n_bootstraps), 
+                           bootstrap(quantile(.5 + percent / 200.), obs_stat, n_bootstraps), error_bar_kwargs, linestyle='')
 #     bin_plot(y_pred, y, n_bins, quantile(.5), mean, '.', label='Mean Observation')
 #     bin_plot(y_pred, y, n_bins, quantile(.5), mean_pm_std(1.), '.', label='Mean Observation + STD')
 #     bin_plot(y_pred, y, n_bins, quantile(.5), mean_pm_std(-1.), '.', label='Mean Observation - STD')
@@ -248,6 +365,15 @@ def calibration_bin_plot(covariate, observed, predicted, obs_stat=mean, pred_sta
     plt.legend(loc='best')
     if title is not None:
         plt.title(title)
+
+def statistic_bin_plot(covariate, observed, predicted, stat, percent=95, n_bins=20, n_bootstraps=100, title=None):
+    error_bar_kwargs = {'marker':'+', 'linestyle':''}
+    bin_error_bar_plot(covariate, observed, n_bins, quantile(.5), stat, bootstrap(quantile(.5 - percent / 200.), stat, n_bootstraps), 
+                       bootstrap(quantile(.5 + percent / 200.), stat, n_bootstraps), error_bar_kwargs, linestyle='')
+    
+    if title is not None:
+        plt.title(title)
+    
 
 # def background_plot(x, y, window_size, statistics, alphas, labels, *args, **kwargs):
 #     
