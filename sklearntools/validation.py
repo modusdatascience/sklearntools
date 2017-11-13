@@ -8,18 +8,21 @@ from operator import __eq__
 from toolz.itertoolz import sliding_window
 from itertools import starmap
 from scipy.stats.kde import gaussian_kde
+from .sklearntools import shrinkd
 
 
 def tolerance_curve(observed, predicted):
-    absdiff = np.abs(observed - predicted)
+    absdiff = np.abs(shrinkd(1,np.asarray(observed)) - shrinkd(1, np.asarray(predicted)))
     absdiff.sort()
     x = np.cumsum(absdiff)
     return x, np.arange(0.,100.,100./float(len(absdiff)))
 
 def total_prediction_curve(observed, predicted):
-    order = np.argsort(predicted)
-    x = np.cumsum(predicted[order])
-    y = np.cumsum(observed[order])
+    observed_ = shrinkd(1,np.asarray(observed))
+    predicted_ = shrinkd(1, np.asarray(predicted))
+    order = np.argsort(predicted_)
+    x = np.cumsum(predicted_[order])
+    y = np.cumsum(observed_[order])
     return x, y
 
 def roc_curve(observed, predicted):
@@ -54,7 +57,7 @@ plot_total_prediction = curry(plot_curve_auc)(total_prediction_curve)
 
 @curry
 def auc(curve, observed, predicted):
-    x, y = roc_curve(observed, predicted)
+    x, y = curve(observed, predicted)
     return sk_auc(x, y)
 
 roc_auc = auc(roc_curve)
@@ -119,6 +122,10 @@ def plot_statistic(statistic, windower, orderer, covariate, observed, predicted,
 
 def plot_roc_auc_for_bins(n_bins, covariate, observed, predicted, error_bar_lower=2.5, error_bar_upper=97.5, error_bar_n=500):
     return plot_statistic(roc_auc, bin_window(n_bins), order_by(np.argsort(covariate)), covariate, observed, 
+                          predicted, error_bar_lower, error_bar_upper, error_bar_n)
+
+def plot_tolerance_auc_for_bins(n_bins, covariate, observed, predicted, error_bar_lower=2.5, error_bar_upper=97.5, error_bar_n=500):
+    return plot_statistic(tolerance_auc, bin_window(n_bins), order_by(np.argsort(covariate)), covariate, observed, 
                           predicted, error_bar_lower, error_bar_upper, error_bar_n)
     
 # def statistic_plot_values(x_stat, y_stat, x_args, y_args=None):
