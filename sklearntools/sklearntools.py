@@ -90,7 +90,10 @@ def growd(d, x):
 @curry
 def shrinkd(d, x):
     if isinstance(x, pandas.DataFrame):
-        return x
+        if x.shape[1] == 1:
+            return x.ix[:,0]
+        else:
+            return x
     shape = x.shape
     l = len(shape)
     if l <= d:

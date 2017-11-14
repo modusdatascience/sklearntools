@@ -1,7 +1,7 @@
-from sympy.core.numbers import RealNumber
+from sympy.core.numbers import RealNumber, Zero
 from sklearn.ensemble.gradient_boosting import BinomialDeviance,\
     LogOddsEstimator, GradientBoostingClassifier, QuantileEstimator,\
-    LossFunction
+    LossFunction, MeanEstimator, ZeroEstimator
 from ..base import call_method_or_dispatch
 from operator import add
 from ..sym_predict_proba import register_sym_predict_proba
@@ -52,6 +52,14 @@ register_sym_predict(QuantileEstimator, sym_predict_quantile_estimator)
 @register_sym_predict(LogOddsEstimator)
 def sym_predict_log_odds_estimator(estimator):
     return RealNumber(estimator.prior)
+
+@register_sym_predict(MeanEstimator)
+def sym_predict_mean_estimator(estimator):
+    return RealNumber(estimator.mean)
+
+@register_sym_predict(ZeroEstimator)
+def sym_predict_zero_estimator(estimator):
+    return Zero()
 
 @register_syms(LossFunction)
 def syms_loss_function(loss):
