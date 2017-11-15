@@ -17,8 +17,6 @@ def syms_isotonic_regression(estimator):
 
 def sym_linear_interp(variable, lower_x, upper_x, lower_y, upper_y):
     slope = RealNumber((upper_y - lower_y) / (upper_x - lower_x))
-    if abs(slope) > 100:
-        1+1
     return slope * (variable - RealNumber(lower_x)) + RealNumber(lower_y) 
 
 @register_sym_predict(IsotonicRegression)

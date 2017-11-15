@@ -47,7 +47,7 @@ def plot_curve_auc(curve, observed, predicted, name, iterations=100, normalize=F
     bsauc = factor*np.asarray(bsauc)
     lower = np.percentile(bsauc, 2.5)
     upper = np.percentile(bsauc, 97.5)
-    plt.plot(fpr, tpr, label='Model %s (AUC = %0.3f, 95%% CI %0.3f-%0.3f)' % (name, auc_, lower, upper), **kwargs)
+    plt.plot(fpr, tpr, label='Model %s (AUC = %0.3e, 95%% CI %0.3e-%0.3e)' % (name, auc_, lower, upper), **kwargs)
     plt.plot([0, 1], [0, 1], 'k--')
     plt.legend(loc=0)
 
