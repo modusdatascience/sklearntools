@@ -2,6 +2,8 @@ from toolz.functoolz import curry
 from sympy.core.function import Function
 
 NAN = Function('NAN')
+Missing = Function('Missing')
+NaNProtect = Function('NaNProtect')
 
 def call_method_or_dispatch(method_name, dispatcher):
     def _call_method_or_dispatch(estimator, *args, **kwargs):

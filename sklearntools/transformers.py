@@ -2,12 +2,12 @@ from .sklearntools import STSimpleEstimator, safe_assign_subset, safe_column_nam
     safe_column_select, safe_assign_column
 from abc import ABCMeta, abstractmethod
 from sympy.core.symbol import Symbol
-from toolz.dicttoolz import keymap
+from toolz.dicttoolz import keymap, valmap, itemmap
 from sympy.functions.elementary.piecewise import Piecewise
 from sympy.core.numbers import RealNumber, One, Zero
 import numpy as np
 from sympy import log as SymLog, Min as SymMin, Max as SymMax
-from .sym.base import NAN
+from .sym.base import NAN, Missing
 from sympy.core.relational import Eq
 
 class ColumnTransformation(object):
@@ -273,7 +273,18 @@ class Censor(TwoArgumentColumnTransformation):
         left = self.left.sym_transform(xlabels)
         right = self.right.sym_transform(xlabels)
         return Piecewise((NAN(1), Eq(right, One())), (left, True))
-        
+
+class Uncensor(TwoArgumentColumnTransformation):
+    def transform(self, X):
+        result = self.left.transform(X).copy()
+        safe_assign_subset(result, np.isnan(result), self.right.transform(X))
+        return result
+    
+    def sym_transform(self, xlabels):
+        left = self.left.sym_transform(xlabels)
+        right = self.right.sym_transform(xlabels)
+        return Piecewise((left, Eq(Missing(left), One())), (right, True))
+
 class VariableTransformer(STSimpleEstimator):
     def __init__(self, transformations):
         self.transformations = transformations
@@ -306,7 +317,10 @@ class VariableTransformer(STSimpleEstimator):
             else:
                 result.append(sym)
         return result
-#     
-#     def sym_transform_parts(self):
-#         pass
+
+def NanMap(nan_map):
+    return VariableTransformer(itemmap(lambda (name, val): 
+                                       (name, Uncensor(Identity(name), Identity(val) if isinstance(val, basestring) 
+                                                       else Constant(val))), nan_map))
+
 

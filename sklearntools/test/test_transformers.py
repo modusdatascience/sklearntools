@@ -1,5 +1,5 @@
 from sklearntools.transformers import Constant, VariableTransformer, Identity,\
-    Censor
+    Censor, NanMap
 import numpy as np
 import pandas
 from numpy.testing.utils import assert_array_almost_equal
@@ -31,7 +31,19 @@ def test_rate():
     assert_array_almost_equal(transformer.transform(X)['rate'], target)
     numpy_test_module = exec_module('numpy_test_module', model_to_code(transformer, 'numpy', 'transform', 'test_model'))
     assert_array_almost_equal(pandas.DataFrame(dict(zip(['count', 'duration', 'rate'], numpy_test_module.test_model(**X))))[['count', 'duration', 'rate']], transformer.transform(X))
-    
+
+def test_uncensor():
+    X = pandas.DataFrame(np.random.normal(size=(10,3)), columns=['x','y','z'])
+    X.loc[1,'x'] = np.nan
+    X.loc[2, 'y'] = np.nan
+    transformer = NanMap({'x': 100.})
+    transformer.fit(X)
+    X_ = transformer.transform(X)
+    assert_array_almost_equal(X['y'], X_['y'])
+    assert not (X['x'] == X_['x']).all()
+    fix = X['x'].copy()
+    fix[1] = 100.
+    assert_array_almost_equal(fix, X_['x'])
 
 if __name__ == '__main__':
     import sys
