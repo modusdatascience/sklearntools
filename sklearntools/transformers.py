@@ -344,9 +344,9 @@ class VariableTransformer(STSimpleEstimator):
                 result.append(sym)
         return result
 
-def NanMap(nan_map):
+def NanMap(nan_map, strict=False):
     return VariableTransformer(itemmap(lambda (name, val): 
                                        (name, Uncensor(Identity(name), Identity(val) if isinstance(val, basestring) 
-                                                       else Constant(val))), nan_map))
+                                                       else Constant(val))), nan_map), strict=strict)
 
 
