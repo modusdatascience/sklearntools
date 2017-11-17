@@ -263,13 +263,13 @@ class PredictorTransformer(DelegatingEstimator):
             return result
         
     def syms(self):
-        return self.estimator_.syms()
+        return syms(self.estimator_)
     
     def sym_transform(self):
-        return [self.sym_predict()]
+        return [sym_predict(self)]
     
     def sym_predict(self):
-        return self.estimator_.sym_predict()
+        return sym_predict(self.estimator_)
     
     def sym_transform_parts(self, target=None):
         return sym_predict_parts(self, target)
