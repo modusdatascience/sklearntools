@@ -1,7 +1,8 @@
 from sympy.core.numbers import RealNumber, Zero
 from sklearn.ensemble.gradient_boosting import BinomialDeviance,\
     LogOddsEstimator, GradientBoostingClassifier, QuantileEstimator,\
-    LossFunction, MeanEstimator, ZeroEstimator, GradientBoostingRegressor
+    LossFunction, MeanEstimator, ZeroEstimator, GradientBoostingRegressor,\
+    BaseGradientBoosting
 from ..base import call_method_or_dispatch
 from operator import add
 from ..sym_predict_proba import register_sym_predict_proba
@@ -19,25 +20,36 @@ from sympy.functions.elementary.piecewise import Piecewise
 from sympy.logic.boolalg import true
 from distutils.version import LooseVersion
 import sklearn
+from sklearntools.sym.sym_decision_function import register_sym_decision_function,\
+    sym_decision_function
 
-def sym_log_odds_estimator_predict(estimator):
-    return RealNumber(estimator.prior)
+# def sym_log_odds_estimator_predict(estimator):
+#     return RealNumber(estimator.prior)
+# 
+# sym_init_function_dispatcher = {LogOddsEstimator: sym_log_odds_estimator_predict}
+# sym_init_function = call_method_or_dispatch('sym_init_function', sym_init_function_dispatcher)
 
-sym_init_function_dispatcher = {LogOddsEstimator: sym_log_odds_estimator_predict}
-sym_init_function = call_method_or_dispatch('sym_init_function', sym_init_function_dispatcher)
-
-@register_sym_predict_proba(GradientBoostingClassifier)
-def sym_predict_proba_gradient_boosting_classifier(estimator):
+@register_sym_decision_function(BaseGradientBoosting)
+def sym_decision_function_gradient_boosting_classifier(estimator):
     learning_rate = RealNumber(estimator.learning_rate)
     trees = map(sym_predict, estimator.estimators_[:,0])
     tree_part = learning_rate * reduce(add, trees)
-    init_part = sym_init_function(estimator.init_)
+    init_part = sym_predict(estimator.init_)
+    return tree_part + init_part
+
+@register_sym_predict_proba(GradientBoostingClassifier)
+def sym_predict_proba_gradient_boosting_classifier(estimator):
+    score = sym_decision_function(estimator)
     score_to_proba_expr = sym_score_to_proba(estimator.loss_)
     score_to_proba_syms = syms(estimator.loss_)
     assert len(score_to_proba_syms) == 1
-    return score_to_proba_expr.subs({score_to_proba_syms[0]: tree_part + init_part})
+    return score_to_proba_expr.subs({score_to_proba_syms[0]: score})
 
-register_input_size(GradientBoostingClassifier, input_size_from_n_features if LooseVersion(sklearn.__version__) < LooseVersion('0.19') else input_size_from_n_features_)
+@register_sym_predict(GradientBoostingRegressor)
+def sym_predict_gradient_boosting_regressor(estimator):
+    return sym_decision_function(estimator)
+
+register_input_size(BaseGradientBoosting, input_size_from_n_features if LooseVersion(sklearn.__version__) < LooseVersion('0.19') else input_size_from_n_features_)
 
 @register_sym_predict(QuantileEstimator)
 def sym_predict_quantile_estimator(estimator):

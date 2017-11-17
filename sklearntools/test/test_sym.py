@@ -14,7 +14,8 @@ from sklearn.tree.tree import DecisionTreeRegressor
 from nose.tools import assert_almost_equal
 from sklearntools.sym.syms import syms
 from sklearn.ensemble.gradient_boosting import GradientBoostingClassifier,\
-    LeastSquaresError, LeastAbsoluteError, HuberLossFunction
+    LeastSquaresError, LeastAbsoluteError, HuberLossFunction,\
+    GradientBoostingRegressor
 from sklearntools.sym.sym_predict_proba import sym_predict_proba
 from sklearntools.gb import GradientBoostingEstimator
 
@@ -116,6 +117,34 @@ def test_huber_loss_export():
     
     # Fit a model
     model = GradientBoostingEstimator(Earth(max_terms=5), loss_function=HuberLossFunction(1))
+    model.fit(X, y)
+    
+    # Export as sympy expression
+    expr = sym_predict(model)
+    
+    # Check some values
+    y_pred = model.predict(X)
+    X_ = pandas.DataFrame(X, columns=[s.name for s in syms(model)])
+    for i in range(10):
+        row = dict(X_.iloc[i,:])
+        assert_almost_equal(y_pred[i], expr.evalf(16, row))
+    
+    # Export python code and check output
+    numpy_test_module = exec_module('numpy_test_module', model_to_code(model, 'numpy', 'predict', 'test_model'))
+    y_pred_numpy = numpy_test_module.test_model(**X_)
+    assert_array_almost_equal(np.ravel(y_pred_numpy), np.ravel(y_pred))
+
+def test_gradient_boosting_regressor():
+    np.random.seed(1)
+    
+    # Create some data
+    m = 10000
+    X = np.random.normal(size=(m,10))
+    beta = np.random.normal(size=10)
+    y = np.random.normal(np.dot(X, beta))
+    
+    # Fit a model
+    model = GradientBoostingRegressor(n_estimators=10)
     model.fit(X, y)
     
     # Export as sympy expression
