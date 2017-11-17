@@ -14,8 +14,8 @@ from .sklearntools import shrinkd
 def tolerance_curve(observed, predicted):
     absdiff = np.abs(shrinkd(1,np.asarray(observed)) - shrinkd(1, np.asarray(predicted)))
     absdiff.sort()
-    x = np.cumsum(absdiff)
-    return x, np.arange(0.,100.,100./float(len(absdiff)))
+#     x = np.cumsum(absdiff)
+    return absdiff, np.arange(0.,100.,100./float(len(absdiff)))
 
 def total_prediction_curve(observed, predicted):
     observed_ = shrinkd(1,np.asarray(observed))
