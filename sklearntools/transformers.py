@@ -2,13 +2,15 @@ from .sklearntools import STSimpleEstimator, safe_assign_subset, safe_column_nam
     safe_column_select, safe_assign_column
 from abc import ABCMeta, abstractmethod
 from sympy.core.symbol import Symbol
-from toolz.dicttoolz import keymap, valmap, itemmap
+from toolz.dicttoolz import keymap, valmap, itemmap, valfilter
 from sympy.functions.elementary.piecewise import Piecewise
 from sympy.core.numbers import RealNumber, One, Zero
 import numpy as np
 from sympy import log as SymLog, Min as SymMin, Max as SymMax
 from .sym.base import NAN, Missing
 from sympy.core.relational import Eq
+from operator import __or__, methodcaller, __ge__
+from toolz.functoolz import curry, compose
 
 class ColumnTransformation(object):
     __metaclass__ = ABCMeta
@@ -18,6 +20,10 @@ class ColumnTransformation(object):
     
     @abstractmethod
     def sym_transform(self):
+        pass
+    
+    @abstractmethod
+    def inputs(self):
         pass
     
     def __call__(self, other):
@@ -116,7 +122,10 @@ class ColumnTransformation(object):
 class Constant(ColumnTransformation):
     def __init__(self, value):
         self.value = value
-        
+    
+    def inputs(self):
+        return set()
+    
     def transform(self, X):
         return np.ones(shape=X.shape[0]) * self.value
     
@@ -126,7 +135,10 @@ class Constant(ColumnTransformation):
 class Identity(ColumnTransformation):
     def __init__(self, column):
         self.column = column
-        
+    
+    def inputs(self):
+        return set([self.column])
+    
     def transform(self, X):
         return safe_column_select(X, self.column)
     
@@ -136,7 +148,10 @@ class Identity(ColumnTransformation):
 class OneArgumentColumnTransformation(ColumnTransformation):
     def __init__(self, arg):
         self.arg = arg
-
+    
+    def inputs(self):
+        return self.arg.inputs()
+    
 class Nonzero(OneArgumentColumnTransformation):
     def transform(self, X):
         return self.arg.transform(X) != 0
@@ -165,6 +180,9 @@ class TwoArgumentColumnTransformation(ColumnTransformation):
     def __init__(self, left, right):
         self.left = left
         self.right = right
+    
+    def inputs(self):
+        return self.left.inputs() | self.right.inputs()
 
 class Min(TwoArgumentColumnTransformation):
     def transform(self, X):
@@ -286,8 +304,13 @@ class Uncensor(TwoArgumentColumnTransformation):
         return Piecewise((left, Eq(Missing(left), One())), (right, True))
 
 class VariableTransformer(STSimpleEstimator):
-    def __init__(self, transformations):
+    def __init__(self, transformations, strict=False):
+        '''
+        strict : (bool) If True, fail on missing inputs.  If False, just
+        skip them.
+        '''
         self.transformations = transformations
+        self.strict = strict
     
     def fit(self, X, y=None, exposure=None, xlabels=None):
         if xlabels is not None:
@@ -295,6 +318,9 @@ class VariableTransformer(STSimpleEstimator):
         else:
             self.xlabels_ = safe_column_names(X)
         self.clean_transformations_ = keymap(clean_column_name(self.xlabels_), self.transformations)
+        if not self.strict:
+            input_variables = set(self.xlabels_)
+            self.clean_transformations_ = valfilter(compose(curry(__ge__)(input_variables), methodcaller('inputs')), self.clean_transformations_)
         return self
     
     def transform(self, X, offset=None, exposure=None):
@@ -313,7 +339,7 @@ class VariableTransformer(STSimpleEstimator):
         for sym in syms:
             name = sym.name
             if name in self.clean_transformations_:
-                result.append(self.transformations[name].sym_transform(self.xlabels_))
+                result.append(self.clean_transformations_[name].sym_transform(self.xlabels_))
             else:
                 result.append(sym)
         return result

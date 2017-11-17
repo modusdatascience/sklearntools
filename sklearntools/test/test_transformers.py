@@ -45,6 +45,20 @@ def test_uncensor():
     fix[1] = 100.
     assert_array_almost_equal(fix, X_['x'])
 
+def test_non_strict():
+    X = pandas.DataFrame(np.random.normal(size=(10,3)), columns=['x','y','z'])
+    X.loc[1,'x'] = np.nan
+    X.loc[2, 'y'] = np.nan
+    transformer = NanMap({'x': 100.,
+                          'w': 0.})
+    transformer.fit(X)
+    X_ = transformer.transform(X)
+    assert_array_almost_equal(X['y'], X_['y'])
+    assert not (X['x'] == X_['x']).all()
+    fix = X['x'].copy()
+    fix[1] = 100.
+    assert_array_almost_equal(fix, X_['x'])
+
 if __name__ == '__main__':
     import sys
     import nose
