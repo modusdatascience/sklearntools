@@ -482,6 +482,31 @@ class LogTransformer(STSimpleEstimator, TransformerMixin):
     def sym_transform(self):
         return map(lambda x: log(Max(RealNumber(self.guard) + RealNumber(self.offset), x + RealNumber(self.offset))), self.syms())
 
+class BoundingTransformer(STSimpleEstimator, TransformerMixin):
+    def __init__(self, lower=-inf, upper=inf):
+        self.lower = lower
+        self.upper = upper
+    
+    def fit(self, X, y=None, sample_weight=None):
+        self.inputs_ = safe_column_names(X)
+        return self
+    
+    def transform(self, X, y=None):
+        result = np.asarray(X.copy())
+        result[np.asarray(X < self.lower)] = self.lower
+        result[np.asarray(X > self.upper)] = self.upper
+        return result
+    
+    def syms(self):
+        return map(Symbol, self.inputs_)
+    
+    def sym_transform(self):
+        def indicator(arg):
+            return Piecewise((RealNumber(self.lower), arg < self.lower),
+                             (RealNumber(self.upper), arg > self.upper),
+                             (arg, True))
+        return map(indicator, self.syms())
+
 class IntervalTransformer(STSimpleEstimator, TransformerMixin):
     def __init__(self, lower=-inf, upper=inf, lower_closed=False, upper_closed=False):
         self.lower = lower
