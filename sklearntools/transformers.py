@@ -301,7 +301,7 @@ class Uncensor(TwoArgumentColumnTransformation):
     def sym_transform(self, xlabels):
         left = self.left.sym_transform(xlabels)
         right = self.right.sym_transform(xlabels)
-        return Piecewise((left, Eq(Missing(left), One())), (right, True))
+        return Piecewise((right, Eq(Missing(left), One())), (left, True))
 
 class VariableTransformer(STSimpleEstimator):
     def __init__(self, transformations, strict=False):
