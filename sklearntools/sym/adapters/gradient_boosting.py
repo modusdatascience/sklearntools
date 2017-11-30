@@ -22,6 +22,7 @@ from distutils.version import LooseVersion
 import sklearn
 from sklearntools.sym.sym_decision_function import register_sym_decision_function,\
     sym_decision_function
+from six.moves import reduce
 
 # def sym_log_odds_estimator_predict(estimator):
 #     return RealNumber(estimator.prior)
@@ -32,7 +33,7 @@ from sklearntools.sym.sym_decision_function import register_sym_decision_functio
 @register_sym_decision_function(BaseGradientBoosting)
 def sym_decision_function_gradient_boosting_classifier(estimator):
     learning_rate = RealNumber(estimator.learning_rate)
-    trees = map(sym_predict, estimator.estimators_[:,0])
+    trees = list(map(sym_predict, estimator.estimators_[:,0]))
     tree_part = learning_rate * reduce(add, trees)
     init_part = sym_predict(estimator.init_)
     return tree_part + init_part

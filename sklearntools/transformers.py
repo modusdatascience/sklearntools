@@ -11,6 +11,7 @@ from .sym.base import NAN, Missing
 from sympy.core.relational import Eq
 from operator import __or__, methodcaller, __ge__
 from toolz.functoolz import curry, compose
+from six import string_types
 
 class ColumnTransformation(object):
     __metaclass__ = ABCMeta
@@ -48,7 +49,10 @@ class ColumnTransformation(object):
         if not isinstance(other, ColumnTransformation):
             other = Constant(other)
         return other - self
-        
+    
+    def __truediv__(self, other):
+        return self.__div__(other)
+    
     def __div__(self, other):
         if not isinstance(other, ColumnTransformation):
             other = Constant(other)
@@ -334,7 +338,7 @@ class VariableTransformer(STSimpleEstimator):
     
     def sym_transform(self):
         input_syms = self.syms() 
-        syms = input_syms + filter(lambda x: x not in input_syms, map(Symbol, self.clean_transformations_.keys()))
+        syms = input_syms + list(filter(lambda x: x not in input_syms, map(Symbol, self.clean_transformations_.keys())))
         result = []
         for sym in syms:
             name = sym.name
@@ -345,8 +349,8 @@ class VariableTransformer(STSimpleEstimator):
         return result
 
 def NanMap(nan_map, strict=False):
-    return VariableTransformer(itemmap(lambda (name, val): 
-                                       (name, Uncensor(Identity(name), Identity(val) if isinstance(val, basestring) 
-                                                       else Constant(val))), nan_map), strict=strict)
+    return VariableTransformer(itemmap(lambda tup: 
+                                       (tup[0], Uncensor(Identity(tup[0]), Identity(tup[1]) if isinstance(tup[1], string_types) 
+                                                       else Constant(tup[1]))), nan_map), strict=strict)
 
 

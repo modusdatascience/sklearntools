@@ -1,13 +1,13 @@
 from sklearn.externals.joblib.parallel import Parallel, delayed
-from calibration import no_cv
+from .calibration import no_cv
 from sklearn.cross_validation import check_cv
 from sklearn.base import is_classifier, clone
-from sklearntools import _fit_and_predict, non_fit_methods, BaseDelegatingEstimator, safe_assign_subset, safer_call
+from .sklearntools import _fit_and_predict, non_fit_methods, BaseDelegatingEstimator, safe_assign_subset, safer_call
 import numpy as np
-from sym.sym_predict import sym_predict
-from sym.syms import syms
-from sym.sym_predict_parts import sym_predict_parts
-from sym.sym_transform_parts import sym_transform_parts
+from .sym.sym_predict import sym_predict
+from .sym.syms import syms
+from .sym.sym_predict_parts import sym_predict_parts
+from .sym.sym_transform_parts import sym_transform_parts
 from .sklearntools import shrinkd
 
 class CrossValidatingEstimator(BaseDelegatingEstimator):

@@ -1,5 +1,6 @@
 from operator import add, or_, __or__
 from itertools import compress, chain
+from six.moves import reduce
 
 def assert_parts_are_composable(parts):
     inputs, expressions, target = parts

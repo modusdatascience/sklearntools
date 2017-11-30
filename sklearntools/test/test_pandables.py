@@ -27,9 +27,14 @@ def test_input_fixing_transformer():
     np.testing.assert_almost_equal(score, 1.)
     
 if __name__ == '__main__':
-    test_input_fixing_transformer()
-    print 'Success!'
-    
+    # This code will run the test in this file.'
+    import sys
+    import nose
+    module_name = sys.modules[__name__].__file__
+
+    result = nose.run(argv=[sys.argv[0],
+                            module_name,
+                            '-s', '-v'])
 
 
 

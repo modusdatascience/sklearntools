@@ -63,5 +63,12 @@ def test_quantile_regression():
     assert score > .25
 
 if __name__ == '__main__':
-    test_quantile_regression()
+    # This code will run the test in this file.'
+    import sys
+    import nose
+    module_name = sys.modules[__name__].__file__
+
+    result = nose.run(argv=[sys.argv[0],
+                            module_name,
+                            '-s', '-v'])
     

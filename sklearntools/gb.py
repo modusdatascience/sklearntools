@@ -53,9 +53,10 @@ if LooseVersion(sklearn.__version__) <= LooseVersion('0.19.1'):
     def negative_gradient(self, y, pred, **kargs):
         y_ = -(2. * y - 1.)
         return - y_ * np.exp(y_ * pred.ravel())
-    
-    ExponentialLoss.negative_gradient = MethodType(negative_gradient, None, ExponentialLoss)
-
+    try:
+        ExponentialLoss.negative_gradient = MethodType(negative_gradient, None, ExponentialLoss)
+    except TypeError:
+        ExponentialLoss.negative_gradient = negative_gradient
 
 
 def log_one_plus_exp_x(x):
@@ -87,8 +88,8 @@ class STExponentialLossFunction(object):
         return ScaledLogOddsEstimator()
     
     def __call__(self, y, pred, sample_weight=None):
-        print y
-        print pred
+        print(y)
+        print(pred)
         pred = pred.ravel()
         if sample_weight is None:
             return np.exp(- y * pred)
