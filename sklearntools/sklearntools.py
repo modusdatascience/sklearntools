@@ -7,18 +7,27 @@ from sklearn.base import BaseEstimator, clone, MetaEstimatorMixin
 import numpy as np
 from six import with_metaclass
 from functools import update_wrapper
-from inspect import getargspec
-from sym.syms import syms
-from sym.sym_update import sym_update
-from sym.sym_predict import sym_predict
-from sym.sym_transform_parts import sym_transform_parts
-from sym.sym_predict_parts import sym_predict_parts
-from sym.sym_predict_proba import sym_predict_proba
+import sys
+if sys.version_info[0] < 3:
+    from inspect import getargspec
+else:
+    from inspect import getfullargspec
+    from collections import namedtuple
+    ArgSpec = namedtuple('ArgSpec', ['args', 'varargs', 'keywords', 'defaults'])
+    def getargspec(*args, **kwargs):
+        return ArgSpec(*getfullargspec(*args, **kwargs)[:4])
+        
+from .sym.syms import syms
+from .sym.sym_update import sym_update
+from .sym.sym_predict import sym_predict
+from .sym.sym_transform_parts import sym_transform_parts
+from .sym.sym_predict_parts import sym_predict_parts
+from .sym.sym_predict_proba import sym_predict_proba
 import pandas
 from sympy.functions.elementary.miscellaneous import Max, Min
 from sympy.core.numbers import RealNumber
 from itertools import chain, starmap
-from sym.sym_transform import sym_transform
+from .sym.sym_transform import sym_transform
 from sympy.core.symbol import Symbol
 from . import __version__
 from toolz.functoolz import curry
@@ -26,6 +35,7 @@ from sklearn.exceptions import NotFittedError
 from operator import __add__, __mul__
 from nose.tools import assert_equal
 from pandas.core.indexing import IndexingError
+from six.moves import reduce
 # 
 # def if_delegate_has_method(*args, **kwargs):
 #     return decorator(sklearn_if_delegate_has_method(*args, **kwargs))
@@ -163,7 +173,7 @@ def safe_column_names(arr):
     if hasattr(arr, 'columns'):
         return list(arr.columns)
     elif len(arr.shape) == 2:
-        return map(lambda i: 'x%d'%i, range(arr.shape[1]))
+        return list(map(lambda i: 'x%d'%i, range(arr.shape[1])))
     elif len(arr.shape) == 1:
         return ['x']
     else:
@@ -403,7 +413,7 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
         expressions = self._sym_update()
         final_expressions = sym_transform(self.final_stage_)
         symbols =  syms(self.final_stage_)
-        final_expressions = map(lambda x: x.subs(dict(zip(symbols, expressions))), final_expressions)
+        final_expressions = list(map(lambda x: x.subs(dict(zip(symbols, expressions))), final_expressions))
         return final_expressions
     
     def syms(self):

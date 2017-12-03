@@ -11,10 +11,11 @@ from .sym_predict_parts import sym_predict_parts
 from .sym_transform_parts import sym_transform_parts
 from .sym_predict_proba_parts import sym_predict_proba_parts
 import imp
+from six import exec_
 
 def exec_module(name, code):
     module = imp.new_module(name)
-    exec code in module.__dict__
+    exec_(code, module.__dict__)
     return module
 
 class STJavaScriptPrinter(JavascriptCodePrinter):

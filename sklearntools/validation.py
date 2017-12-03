@@ -75,13 +75,13 @@ def density_plot(data):
     
     
 def common_size(*args):
-    n_rows = map(lambda x: x.shape[0], args)
+    n_rows = list(map(lambda x: x.shape[0], args))
     assert all(starmap(__eq__, sliding_window(2, n_rows)))
     return n_rows[0]
 
 def order_by(order):
     def order_by_(*args):
-        return map(flip(safe_rows_select)(order), args)
+        return list(map(flip(safe_rows_select)(order), args))
     return order_by_
 
 def moving_window(window_size):

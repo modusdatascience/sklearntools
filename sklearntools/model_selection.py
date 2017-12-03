@@ -1,4 +1,4 @@
-from sklearntools import BaseDelegatingEstimator,\
+from .sklearntools import BaseDelegatingEstimator,\
     non_fit_methods, safer_call, sym_methods
 from sklearn.base import clone
 from sklearn.metrics.scorer import check_scoring

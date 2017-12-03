@@ -1,4 +1,4 @@
-import adapters
+from . import adapters
 import importlib
 import pkgutil
 

@@ -1,6 +1,6 @@
 from .sklearntools import STSimpleEstimator
 from sympy.core.symbol import Symbol
-from sym.syms import syms_x, syms
+from .sym.syms import syms_x, syms
 import numpy as np
 
 class Pandable(object):

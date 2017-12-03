@@ -1,4 +1,4 @@
-from sklearntools import STSimpleEstimator, DelegatingEstimator, non_fit_methods,\
+from .sklearntools import STSimpleEstimator, DelegatingEstimator, non_fit_methods,\
     standard_methods, safe_col_select, safe_call, safe_column_names
 from sklearn.base import MetaEstimatorMixin, is_classifier, clone,\
     TransformerMixin
@@ -6,13 +6,13 @@ from sklearn.cross_validation import check_cv
 from sklearn.externals.joblib.parallel import Parallel, delayed
 import numpy as np
 from sklearn.utils.metaestimators import if_delegate_has_method
-from sym.sym_transform import sym_transform
-from sym.sym_predict import sym_predict
-from sym.sym_predict_proba import sym_predict_proba
-from sym.syms import syms
-from sym.sym_predict_parts import sym_predict_parts
-from sym.sym_transform_parts import sym_transform_parts
-from sklearntools import safe_assign_subset, _fit_and_predict, safer_call
+from .sym.sym_transform import sym_transform
+from .sym.sym_predict import sym_predict
+from .sym.sym_predict_proba import sym_predict_proba
+from .sym.syms import syms
+from .sym.sym_predict_parts import sym_predict_parts
+from .sym.sym_transform_parts import sym_transform_parts
+from .sklearntools import safe_assign_subset, _fit_and_predict, safer_call
 from sympy.core.symbol import Symbol
 from numpy import inf
 from sympy.functions.elementary.exponential import log
@@ -283,7 +283,7 @@ class SelectorTransformer(STSimpleEstimator):
     '''
     def __init__(self, columns):
         self.columns = columns
-        assert len(self.columns) == len(set(self.columns))
+        assert len(list(self.columns)) == len(set(self.columns))
 
     def fit(self, X, y=None, sample_weight=None, exposure=None):
         if hasattr(X, 'columns'):
@@ -477,10 +477,10 @@ class LogTransformer(STSimpleEstimator, TransformerMixin):
         return np.log(self.offset + np.maximum(X,self.guard))
     
     def syms(self):
-        return map(Symbol, self.inputs_)
+        return list(map(Symbol, self.inputs_))
     
     def sym_transform(self):
-        return map(lambda x: log(Max(RealNumber(self.guard) + RealNumber(self.offset), x + RealNumber(self.offset))), self.syms())
+        return list(map(lambda x: log(Max(RealNumber(self.guard) + RealNumber(self.offset), x + RealNumber(self.offset))), self.syms()))
 
 class BoundingTransformer(STSimpleEstimator, TransformerMixin):
     def __init__(self, lower=-inf, upper=inf):
@@ -498,14 +498,14 @@ class BoundingTransformer(STSimpleEstimator, TransformerMixin):
         return result
     
     def syms(self):
-        return map(Symbol, self.inputs_)
+        return list(map(Symbol, self.inputs_))
     
     def sym_transform(self):
         def indicator(arg):
             return Piecewise((RealNumber(self.lower), arg < self.lower),
                              (RealNumber(self.upper), arg > self.upper),
                              (arg, True))
-        return map(indicator, self.syms())
+        return list(map(indicator, self.syms()))
 
 class IntervalTransformer(STSimpleEstimator, TransformerMixin):
     def __init__(self, lower=-inf, upper=inf, lower_closed=False, upper_closed=False):
@@ -531,14 +531,14 @@ class IntervalTransformer(STSimpleEstimator, TransformerMixin):
         return result
     
     def syms(self):
-        return map(Symbol, self.inputs_)
+        return list(map(Symbol, self.inputs_))
     
     def sym_transform(self):
         def indicator(arg):
             return Piecewise((RealNumber(0), arg < self.lower if self.lower_closed else arg <= self.lower),
                              (RealNumber(0), arg > self.upper if self.upper_closed else arg >= self.upper),
                              (RealNumber(1), True))
-        return map(indicator, self.syms())
+        return list(map(indicator, self.syms()))
     
 def index(table, idx0, idx1):
     if hasattr(table, 'loc'):

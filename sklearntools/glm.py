@@ -2,7 +2,7 @@
 import statsmodels.api
 import statsmodels.genmod.families.family
 import numpy as np
-from sklearntools import STSimpleEstimator
+from .sklearntools import STSimpleEstimator
 from statsmodels.genmod.families.links import log
 
 class GLM(STSimpleEstimator):
