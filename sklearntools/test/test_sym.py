@@ -8,7 +8,7 @@ import execjs
 from sklearntools.calibration import LogTransformer,\
     ResponseTransformingEstimator, CalibratedEstimatorCV, \
     MovingAverageSmoothingEstimator, SelectorTransformer, IntervalTransformer, \
-    PredictorTransformer
+    PredictorTransformer, ProbaPredictingEstimator
 from sklearntools.kfold import CrossValidatingEstimator
 from sklearn.tree.tree import DecisionTreeRegressor
 from nose.tools import assert_almost_equal
@@ -18,6 +18,7 @@ from sklearn.ensemble.gradient_boosting import GradientBoostingClassifier,\
     GradientBoostingRegressor
 from sklearntools.sym.sym_predict_proba import sym_predict_proba
 from sklearntools.gb import GradientBoostingEstimator
+from nose import SkipTest
 
 def test_sklearn_gradient_boosting_classifier_export():
     np.random.seed(1)
@@ -116,7 +117,7 @@ def test_huber_loss_export():
     y = np.random.normal(np.dot(X, beta))
     
     # Fit a model
-    model = GradientBoostingEstimator(Earth(max_terms=5), loss_function=HuberLossFunction(1))
+    model = GradientBoostingEstimator(Earth(max_terms=5, smooth=True), loss_function=HuberLossFunction(1))
     model.fit(X, y)
     
     # Export as sympy expression
@@ -258,13 +259,35 @@ def test_more_sym_stuff():
     numpy_test_module = exec_module('numpy_test_module', model_to_code(model, 'numpy', 'predict', 'test_model'))
     y_pred = numpy_test_module.test_model(**X)
     assert_array_almost_equal(np.ravel(y_pred), np.ravel(model.predict(X)))
+
+@SkipTest
+def test_sym_predict_prior_probability_estimator():
+    np.random.seed(1)
+    m = 1000
+    n = 10
+    X = np.random.normal(scale=.5,size=(m,n))**2
+    beta = np.random.normal(scale=1.5,size=n)**2
+    eta = np.dot(X, beta)
+    X = pandas.DataFrame(X, columns=['col%d' % i for i in range(n)])
+    p = 1. / (1. + np.exp(-eta))
+    y = np.random.binomial(3, p)
+    
+    model = ProbaPredictingEstimator(GradientBoostingClassifier(n_estimators=100))
+    
+    model.fit(X, y)
+    
+    numpy_test_module = exec_module('numpy_test_module', model_to_code(model, 'numpy', 'predict', 'test_model'))
+    y_pred = numpy_test_module.test_model(**X)
+    assert_array_almost_equal(np.ravel(y_pred), np.ravel(model.predict(X)))
+    
+    
     
 if __name__ == '__main__':
     import sys
     import nose
     # This code will run the test in this file.'
     module_name = sys.modules[__name__].__file__
-
+ 
     result = nose.run(argv=[sys.argv[0],
                             module_name,
                             '-s', '-v'])

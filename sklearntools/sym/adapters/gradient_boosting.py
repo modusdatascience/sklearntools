@@ -2,7 +2,7 @@ from sympy.core.numbers import RealNumber, Zero
 from sklearn.ensemble.gradient_boosting import BinomialDeviance,\
     LogOddsEstimator, GradientBoostingClassifier, QuantileEstimator,\
     LossFunction, MeanEstimator, ZeroEstimator, GradientBoostingRegressor,\
-    BaseGradientBoosting
+    BaseGradientBoosting, PriorProbabilityEstimator
 from ..base import call_method_or_dispatch
 from operator import add
 from ..sym_predict_proba import register_sym_predict_proba
@@ -32,11 +32,18 @@ from sklearntools.sym.sym_decision_function import register_sym_decision_functio
 @register_sym_decision_function(BaseGradientBoosting)
 def sym_decision_function_gradient_boosting_classifier(estimator):
     learning_rate = RealNumber(estimator.learning_rate)
-    trees = map(sym_predict, estimator.estimators_[:,0])
-    tree_part = learning_rate * reduce(add, trees)
+    n_classes = estimator.estimators_.shape[1]
+    trees = [map(sym_predict, estimator.estimators_[:,i]) for i in range(n_classes)]
+    tree_part = [learning_rate * reduce(add, trees[i]) for i in range(n_classes)]
     init_part = sym_predict(estimator.init_)
-    return tree_part + init_part
-
+    if not isinstance(init_part, list):
+        init_part = [init_part]
+    result = [tree_part[i] + init_part[i] for i in range(n_classes)]
+    if len(result) == 1:
+        return result[0]
+    else:
+        return result
+    
 @register_sym_predict_proba(GradientBoostingClassifier)
 def sym_predict_proba_gradient_boosting_classifier(estimator):
     score = sym_decision_function(estimator)
@@ -50,6 +57,14 @@ def sym_predict_gradient_boosting_regressor(estimator):
     return sym_decision_function(estimator)
 
 register_input_size(BaseGradientBoosting, input_size_from_n_features if LooseVersion(sklearn.__version__) < LooseVersion('0.19') else input_size_from_n_features_)
+
+@register_sym_predict(PriorProbabilityEstimator)
+def sym_predict_prior_probability_estimator(estimator):
+    result = map(RealNumber, estimator.priors)
+    if len(result) == 1:
+        return result[0]
+    else:
+        return result
 
 @register_sym_predict(QuantileEstimator)
 def sym_predict_quantile_estimator(estimator):
