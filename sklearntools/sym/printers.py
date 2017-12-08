@@ -151,6 +151,7 @@ language_function_template_dispatcher = {
 
 language_assignment_statement_dispatcher = defaultdict(lambda: lambda symbols, function_name, input_symbols: ', '.join(symbols) + ' = %s(%s)' % (function_name, ', '.join(input_symbols)) )
 language_assignment_statement_dispatcher['javascript'] = javascript_assigner
+language_assignment_statement_dispatcher['numpy'] = lambda symbols, function_name, input_symbols: ', '.join(symbols) + ' = %s(%s)' % (function_name, ', '.join(['%s=%s' % (name,name) for name in input_symbols]))
 language_return_statement_dispatcher = defaultdict(lambda: lambda expressions: 'return ' + ', '.join(expressions))
 language_return_statement_dispatcher['javascript'] = lambda expressions: 'return [' + ', '.join(expressions) + ']'
 
@@ -217,7 +218,7 @@ def parts_to_code(parts, language, function_name, all_variables):
             index += 1
             
         return_code = returner(map(printer, expressions))
-        function = function_template.render(function_name=name, input_names=map(lambda x: x.name, first_inputs), 
+        function = function_template.render(function_name=name, input_names=list(map(lambda x: x.name, first_inputs)), 
                                             body_code=body_code, return_code=return_code)
         functions.append(function)
         if target is not None:
