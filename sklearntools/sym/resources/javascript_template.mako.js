@@ -14,6 +14,15 @@ function nanprotect(val) {
   }
 };
 
+function expit(val) {
+	if x >= 0:
+        z = Math.exp(-val)
+        return 1 / (1 + z)
+    else:
+        z = Math.exp(val)
+        return z / (1 + z)
+}
+
 %for function_code in functions:
 ${function_code}
 %endfor

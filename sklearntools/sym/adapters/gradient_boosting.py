@@ -12,7 +12,6 @@ from ..input_size import register_input_size,\
 from sklearntools.sym.sym_predict import register_sym_predict
 from sympy.core.symbol import Symbol
 from sklearntools.sym.syms import register_syms, syms
-from sympy import exp
 from sklearntools.sym.sym_score_to_proba import register_sym_score_to_proba,\
     sym_score_to_proba
 from sklearntools.sym.sym_score_to_decision import register_sym_score_to_decision
@@ -23,6 +22,7 @@ import sklearn
 from sklearntools.sym.sym_decision_function import register_sym_decision_function,\
     sym_decision_function
 from six.moves import reduce
+from ..base import Expit
 
 # def sym_log_odds_estimator_predict(estimator):
 #     return RealNumber(estimator.prior)
@@ -76,7 +76,7 @@ def syms_loss_function(loss):
 def sym_score_to_proba_binomial_deviance(loss):
     symbols = syms(loss)
     assert len(symbols) == 1
-    return 1 / (1 + exp(-symbols[0]))
+    return Expit(symbols[0])
 
 @register_sym_score_to_decision(BinomialDeviance)
 def sym_score_to_decision(loss):

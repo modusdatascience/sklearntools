@@ -34,17 +34,9 @@ def test_sklearn_gradient_boosting_classifier_export():
     model = GradientBoostingClassifier(max_depth=10, n_estimators=10)
     model.fit(X, y)
     
-    # Export as sympy expression
-    expr = sym_predict_proba(model)
-    
-    # Check some values
+    # Export python code and check output
     y_pred = model.predict_proba(X)[:,1]
     X_ = pandas.DataFrame(X, columns=[s.name for s in syms(model)])
-    for i in range(10):
-        row = dict(X_.iloc[i,:])
-        assert_almost_equal(y_pred[i], expr.evalf(16, row))
-    
-    # Export python code and check output
     code = model_to_code(model, 'numpy', 'predict_proba', 'test_model')
     numpy_test_module = exec_module('numpy_test_module', code)
     y_pred_numpy = numpy_test_module.test_model(**X_)

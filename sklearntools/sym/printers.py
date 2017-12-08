@@ -31,6 +31,9 @@ class STJavaScriptPrinter(JavascriptCodePrinter):
     def _print_Missing(self, expr):
         return 'missing(' + ','.join(self._print(a) for a in expr.args) + ')'
     
+    def _print_Expit(self, expr):
+        return 'expit(' + ','.join(self._print(i) for i in expr.args) + ')'
+    
     def _print_NAN(self, expr):
         return 'NaN'
     
@@ -64,6 +67,9 @@ class STNumpyPrinter(NumPyPrinter):
 
     def _print_Missing(self, expr):
         return 'isnan(' + ','.join(self._print(a) for a in expr.args) + ').astype(float)'
+    
+    def _print_Expit(self, expr):
+        return 'expit(' + ','.join(self._print(i) for i in expr.args) + ')'
     
     def _print_NAN(self, expr):
         return 'nan'
@@ -104,6 +110,9 @@ class STPythonPrinter(PythonPrinter):
 
     def _print_Missing(self, expr):
         return 'missing(' + ','.join(self._print(i) for i in expr.args) + ')'
+    
+    def _print_Expit(self, expr):
+        return 'expit(' + ','.join(self._print(i) for i in expr.args) + ')'
     
     def _print_NAN(self, expr):
         return 'float(\'nan\')'
