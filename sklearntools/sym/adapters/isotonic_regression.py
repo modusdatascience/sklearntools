@@ -34,7 +34,7 @@ def sym_predict_isotonic_regression(estimator):
     if estimator.out_of_bounds == 'clip':
         pieces.append((y_upper, variable < RealNumber(x_upper)))
     elif estimator.out_of_bounds == 'nan':
-        pieces.append((y_upper, NAN()))
+        pieces.append((NAN(), variable < RealNumber(x_upper)))
     else:
         raise ValueError('out_of_bounds=%s not supported.' % estimator.out_of_bounds)
     
@@ -44,12 +44,12 @@ def sym_predict_isotonic_regression(estimator):
         y_lower = y_upper
         x_upper = estimator.f_.x[i]
         y_upper = estimator.f_.y[i]
-        pieces.append((sym_linear_interp(variable, x_lower, x_upper, y_lower, y_upper), (RealNumber(x_lower) <= variable) & (variable < RealNumber(x_upper))))
+        pieces.append((sym_linear_interp(variable, x_lower, x_upper, y_lower, y_upper), (RealNumber(x_lower) <= variable) & (variable <= RealNumber(x_upper))))
     
     if estimator.out_of_bounds == 'clip':
         pieces.append((y_upper, variable >= RealNumber(x_upper)))
     elif estimator.out_of_bounds == 'nan':
-        pieces.append((y_upper, NAN()))
+        pieces.append((NAN(), variable > RealNumber(x_upper)))
     else:
         raise ValueError('out_of_bounds=%s not supported.' % estimator.out_of_bounds)
     
@@ -72,7 +72,7 @@ def predict_isotonic(estimator, value):
 if __name__ == '__main__':
     from sklearntools.calibration import IsotonicRegressor
     import numpy as np
-    X = np.random.normal(size=1000)
+    X = np.random.normal(size=1000) + 100
     y = np.random.normal(X ** 2, .1)
     estimator = IsotonicRegressor(out_of_bounds='clip').fit(X, y)
     for v in np.arange(-10,10,.1):
@@ -84,4 +84,5 @@ if __name__ == '__main__':
     y_pred = estimator.predict(shrinkd(1,np.asarray(X)))
     y_pred_test = [predict_isotonic(estimator, v) for v in X]
     assert_array_almost_equal(np.ravel(y_pred_numpy), np.ravel(y_pred))
+    print('Success!')
     

@@ -12,11 +12,20 @@ from .sym_transform_parts import sym_transform_parts
 from .sym_predict_proba_parts import sym_predict_proba_parts
 import imp
 from six import exec_
+from toolz.functoolz import curry
 
 def exec_module(name, code):
     module = imp.new_module(name)
     exec_(code, module.__dict__)
     return module
+
+@curry
+def reduction(function_name, self, args):
+    if len(args) == 1:
+        return self._print(args[0])
+    else:
+        return function_name + '(' + self._print(args[0]) + ',' + reduction(function_name, self, args[1:]) + ')'
+
 
 class STJavaScriptPrinter(JavascriptCodePrinter):
     def _print_Max(self, expr):
@@ -54,7 +63,14 @@ def javascript_assigner(symbols, function_name, input_symbols):
 #     return javascript_template.render(function_name=function_name, input_names=input_names,
 #                                       function_code=STJavaScriptPrinter().doprint(expression))
 
+
 class STNumpyPrinter(NumPyPrinter):
+    def _print_And(self, expr):
+        return reduction('logical_and', self, expr.args)
+    
+    def _print_Or(self, expr):
+        return reduction('logical_or', self, expr.args)
+    
     def _print_Max(self, expr):
         return 'maximum(' + ','.join(self._print(i) for i in expr.args) + ')'
     
