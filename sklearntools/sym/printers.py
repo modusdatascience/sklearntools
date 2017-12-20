@@ -210,7 +210,10 @@ def parts_to_code(parts, language, function_name, all_variables):
         if previous is None:
             body_code = ''
         else:
-            body_code = assigner(*previous)
+            if previous[0]:
+                body_code = assigner(*previous)
+            else:
+                body_code = ''
         if target is None:
             name = function_name
         else:
@@ -223,7 +226,7 @@ def parts_to_code(parts, language, function_name, all_variables):
         functions.append(function)
         if target is not None:
             target_inputs, _, _ = target
-            previous = (map(lambda x: x.name, target_inputs), name, map(lambda x: x.name, first_inputs))
+            previous = (list(map(lambda x: x.name, target_inputs)), name, list(map(lambda x: x.name, first_inputs)))
             inputs, expressions, target = target
         else:
             break

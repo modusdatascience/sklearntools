@@ -10,6 +10,7 @@ from sklearntools.sym.sym_predict import register_sym_predict
 from sklearn.isotonic import IsotonicRegression
 from numpy.testing.utils import assert_array_almost_equal
 from sklearntools.sklearntools import shrinkd
+import numpy as np
 
 @register_syms(IsotonicRegression)
 def syms_isotonic_regression(estimator):
@@ -23,8 +24,11 @@ def sym_linear_interp(variable, lower_x, upper_x, lower_y, upper_y):
 def sym_predict_isotonic_regression(estimator):
     variable = syms(estimator)[0]
     pieces = []
-    x_upper = estimator.f_.x[0]
-    y_upper = estimator.f_.y[0]
+    try:
+        x_upper = estimator.f_.x[0]
+        y_upper = estimator.f_.y[0]
+    except AttributeError:
+        return RealNumber(estimator.f_(np.array([0.]))[0])
     i = 0
     n = len(estimator.f_.x)
     if estimator.out_of_bounds == 'clip':
@@ -76,7 +80,7 @@ if __name__ == '__main__':
     
     code = model_to_code(estimator, 'numpy', 'predict', 'test_model')
     numpy_test_module = exec_module('numpy_test_module', code)
-    y_pred_numpy = numpy_test_module.test_model(shrinkd(1, np.asarray(X)))
+    y_pred_numpy = numpy_test_module.test_model(x=shrinkd(1, np.asarray(X)))
     y_pred = estimator.predict(shrinkd(1,np.asarray(X)))
     y_pred_test = [predict_isotonic(estimator, v) for v in X]
     assert_array_almost_equal(np.ravel(y_pred_numpy), np.ravel(y_pred))

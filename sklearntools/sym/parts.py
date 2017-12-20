@@ -45,7 +45,7 @@ def trim_parts(parts, top=True):
     else:
         target_result, index = trim_parts(target, top=False)
         used_expressions = list(compress(expressions, index))
-        used_symbols = reduce(or_, map(lambda x: x.free_symbols, used_expressions))
+        used_symbols = reduce(or_, map(lambda x: x.free_symbols, used_expressions), set())
         used_inputs = [inp for inp in inputs if inp in used_symbols]
         new_index = [inp in used_symbols for inp in inputs]
         result, index_result = (used_inputs, used_expressions, target_result), new_index
