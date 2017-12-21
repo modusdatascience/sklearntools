@@ -167,7 +167,7 @@ language_function_template_dispatcher = {
 
 language_assignment_statement_dispatcher = defaultdict(lambda: lambda symbols, function_name, input_symbols: ', '.join(symbols) + ' = %s(%s)' % (function_name, ', '.join(input_symbols)) )
 language_assignment_statement_dispatcher['javascript'] = javascript_assigner
-language_assignment_statement_dispatcher['numpy'] = lambda symbols, function_name, input_symbols: ', '.join(symbols) + ' = %s(%s)' % (function_name, ', '.join(['%s=%s' % (name,name) for name in input_symbols]))
+language_assignment_statement_dispatcher['numpy'] = lambda symbols, function_name, input_symbols: ', '.join(symbols) + ' = %s(**kwargs)' % function_name
 language_return_statement_dispatcher = defaultdict(lambda: lambda expressions: 'return ' + ', '.join(expressions))
 language_return_statement_dispatcher['javascript'] = lambda expressions: 'return [' + ', '.join(expressions) + ']'
 
