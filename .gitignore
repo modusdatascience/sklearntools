@@ -3,3 +3,5 @@
 *.pyc
 build
 sklearntools/test/*.png
+*.so
+*.o
