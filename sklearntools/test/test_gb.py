@@ -16,6 +16,7 @@ from sklearntools.sym.printers import model_to_code, exec_module
 import pandas
 from sklearn.datasets.samples_generator import make_classification
 from nose import SkipTest
+from sklearn.calibration import CalibratedClassifierCV
 
 def test_smooth_quantile_loss_function():
     np.random.seed(0)
@@ -60,6 +61,18 @@ def test_gradient_boosting_estimator_with_binomial_deviance_loss():
     y_pred_ = numpy_test_module.test_model(**X_)
     y_pred = model.predict_proba(X)[:,1]
     assert_array_almost_equal(y_pred, y_pred_)
+
+def test_with_calibrated_classifier():
+    np.random.seed(0)
+    X, y = make_classification(n_classes=2)
+    loss_function = BinomialDeviance(2)
+    model = CalibratedClassifierCV(GradientBoostingEstimator(Earth(max_degree=2, use_fast=True, max_terms=10), 
+                                                                loss_function),
+                                   method='isotonic')
+    model.fit(X, y)
+    assert_greater(np.sum(model.predict(X)==y) / float(y.shape[0]), .90)
+    assert_true(np.all(0<=model.predict_proba(X)))
+    assert_true(np.all(1>=model.predict_proba(X)))
 
 @SkipTest
 def test_gradient_boosting_estimator_with_smooth_quantile_loss():
