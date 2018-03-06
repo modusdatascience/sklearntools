@@ -51,7 +51,7 @@ class CrossValidatingEstimator(BaseDelegatingEstimator):
             cv = no_cv(X=X, y=y)
         else:
             if hasattr(self.cv, 'split'):
-                cv = self.cv.split(X, y)
+                cv = self.cv.split(X, np.ravel(y))
             else:
                 cv = check_cv(self.cv, X=X, y=shrinkd(1,np.asarray(y)), classifier=is_classifier(self.estimator))
                 

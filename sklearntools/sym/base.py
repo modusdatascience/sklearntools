@@ -27,7 +27,7 @@ def fallback(*args):
         while steps:
             try:
                 return steps.pop(0)(*inner_args, **kwargs)
-            except AttributeError:
+            except:
                 if not steps:
                     raise
     _fallback.__name__ = args[0].__name__
