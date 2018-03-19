@@ -353,7 +353,7 @@ class GradientBoostingEstimator(BaseDelegatingEstimator):
             return self.loss_function._score_to_decision(score)
         else:
             return score
-    
+        
     def sym_predict(self):
         if not hasattr(self, 'estimator_'):
             raise NotFittedError()

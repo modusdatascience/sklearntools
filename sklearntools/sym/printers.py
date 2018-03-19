@@ -5,7 +5,7 @@ from mako.template import Template
 from sympy.printing.lambdarepr import NumPyPrinter
 from sympy.printing.python import PythonPrinter
 from _collections import defaultdict
-from operator import add
+from operator import add, methodcaller
 from .parts import trim_parts, assert_parts_are_composable
 from .sym_predict_parts import sym_predict_parts
 from .sym_transform_parts import sym_transform_parts
@@ -256,8 +256,31 @@ model_to_code_method_dispatch = {'predict': sym_predict_parts,
                                  'transform': sym_transform_parts,
                                  'predict_proba': sym_predict_proba_parts}
 
-def model_to_code(model, language, method, function_name, all_variables=False):
+def substitute_parts(substitutions, parts):
+    if parts[2] is None:
+        return (
+                    list(map(methodcaller('subs', substitutions), parts[0])), 
+                    list(map(methodcaller('subs', substitutions), parts[1])),
+                    parts[2]
+                )
+    else:
+        return (
+                parts[0],
+                parts[1],
+                substitute_parts(substitutions, parts[2])
+                )
+
+def model_to_code(model, language, method, function_name, all_variables=False, substitutions={}):
     parts = model_to_code_method_dispatch[method](model)
+    if substitutions:
+        print('substituting...')
+        parts = (
+                    list(map(methodcaller('subs', substitutions), parts[0])), 
+                    list(map(methodcaller('subs', substitutions), parts[1])),
+                    parts[2]
+                )
+        print(parts[0])
+        print(parts[1])
     assert_parts_are_composable(parts)
     result = parts_to_code(parts, language, function_name, all_variables)
     return result

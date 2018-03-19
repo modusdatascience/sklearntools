@@ -19,6 +19,9 @@ from sklearn.ensemble.gradient_boosting import GradientBoostingClassifier,\
 from sklearntools.sym.sym_predict_proba import sym_predict_proba
 from sklearntools.gb import GradientBoostingEstimator
 from nose import SkipTest
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.linear_model.logistic import LogisticRegression
+from sympy.core.symbol import Symbol
 
 def test_sklearn_gradient_boosting_classifier_export():
     np.random.seed(1)
@@ -272,9 +275,37 @@ def test_sym_predict_prior_probability_estimator():
     y_pred = numpy_test_module.test_model(**X)
     assert_array_almost_equal(np.ravel(y_pred), np.ravel(model.predict(X)))
     
+
+def test_sym_predict_calibrated_classifier_cv():
+    np.random.seed(1)
     
+    # Create some data
+    m = 10000
+    n = 10
+    X = np.random.normal(size=(m,n))
+    thresh = np.random.normal(size=n)
+    X_transformed = X * (X > thresh)
+    beta = np.random.normal(size=n)
+    y = (np.dot(X_transformed, beta) + np.random.normal(size=m)) > 0
+    X = pandas.DataFrame(X, columns=['x%d' % i for i in range(n)])
+    
+    model = ProbaPredictingEstimator(CalibratedClassifierCV(LogisticRegression(), method='isotonic'))
+    model.fit(X, y)
+    
+    code = model_to_code(model, 'numpy', 'predict', 'test_model')#, substitutions=dict(zip(map(Symbol, ['x%d'%i for i in range(n)]), map(Symbol, X.columns))))
+    numpy_test_module = exec_module('numpy_test_module', code)
+    try:
+        y_pred = numpy_test_module.test_model(**X)
+        y_pred_correct = np.ravel(model.predict(X))
+        assert_array_almost_equal(np.ravel(y_pred), y_pred_correct)
+    except:
+        print(code)
+        print(X)
+        raise
     
 if __name__ == '__main__':
+    test_sym_predict_calibrated_classifier_cv()
+    exit()
     import sys
     import nose
     # This code will run the test in this file.'

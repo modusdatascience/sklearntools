@@ -9,12 +9,16 @@ from sklearntools.sym.printers import model_to_code, exec_module
 from sklearntools.sym.sym_predict import register_sym_predict
 from sklearn.isotonic import IsotonicRegression
 from numpy.testing.utils import assert_array_almost_equal
-from sklearntools.sklearntools import shrinkd
 import numpy as np
+from ..input_size import register_input_size
 
 @register_syms(IsotonicRegression)
 def syms_isotonic_regression(estimator):
     return [Symbol('x')]
+
+@register_input_size(IsotonicRegression)
+def input_size_isotonic_regression(estimator):
+    return 1
 
 def sym_linear_interp(variable, lower_x, upper_x, lower_y, upper_y):
     slope = RealNumber((upper_y - lower_y) / (upper_x - lower_x))
@@ -69,20 +73,20 @@ def predict_isotonic(estimator, value):
         slope = (upper_y - lower_y) / (upper_x - lower_x)
         return lower_y + slope * (value - lower_x)
     
-if __name__ == '__main__':
-    from sklearntools.calibration import IsotonicRegressor
-    import numpy as np
-    X = np.random.normal(size=1000) + 100
-    y = np.random.normal(X ** 2, .1)
-    estimator = IsotonicRegressor(out_of_bounds='clip').fit(X, y)
-    for v in np.arange(-10,10,.1):
-        assert_almost_equal(predict_isotonic(estimator, v), estimator.predict([v])[0])
-    
-    code = model_to_code(estimator, 'numpy', 'predict', 'test_model')
-    numpy_test_module = exec_module('numpy_test_module', code)
-    y_pred_numpy = numpy_test_module.test_model(x=shrinkd(1, np.asarray(X)))
-    y_pred = estimator.predict(shrinkd(1,np.asarray(X)))
-    y_pred_test = [predict_isotonic(estimator, v) for v in X]
-    assert_array_almost_equal(np.ravel(y_pred_numpy), np.ravel(y_pred))
-    print('Success!')
-    
+# if __name__ == '__main__':
+#     from sklearntools.calibration import IsotonicRegressor
+#     import numpy as np
+#     X = np.random.normal(size=1000) + 100
+#     y = np.random.normal(X ** 2, .1)
+#     estimator = IsotonicRegressor(out_of_bounds='clip').fit(X, y)
+#     for v in np.arange(-10,10,.1):
+#         assert_almost_equal(predict_isotonic(estimator, v), estimator.predict([v])[0])
+#     
+#     code = model_to_code(estimator, 'numpy', 'predict', 'test_model')
+#     numpy_test_module = exec_module('numpy_test_module', code)
+#     y_pred_numpy = numpy_test_module.test_model(x=np.ravel(np.asarray(X)))
+#     y_pred = estimator.predict(np.ravel(np.asarray(X)))
+#     y_pred_test = [predict_isotonic(estimator, v) for v in X]
+#     assert_array_almost_equal(np.ravel(y_pred_numpy), np.ravel(y_pred))
+#     print('Success!')
+#     

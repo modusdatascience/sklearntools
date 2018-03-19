@@ -21,6 +21,7 @@ from sympy.core.numbers import RealNumber
 from sympy.functions.elementary.miscellaneous import Max
 from .sklearntools import shrinkd
 from sklearn.isotonic import IsotonicRegression
+from .sym.input_size import input_size
 
 # def _fit_and_predict(estimator, X, y, train, test, sample_weight=None, exposure=None):
 #     '''
@@ -589,7 +590,10 @@ class ProbaPredictingEstimator(DelegatingEstimator):
     
     def syms(self):
         return syms(self.estimator_)
-        
+    
+    def input_size(self):
+        return input_size(self.estimator_)
+    
 class ResponseTransformingEstimator(DelegatingEstimator):
     def __init__(self, estimator, transformer, est_weight=False, est_exposure=False, trans_weight=False,
                  trans_exposure=False):

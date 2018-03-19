@@ -9,6 +9,7 @@ from .sym.syms import syms
 from .sym.sym_predict_parts import sym_predict_parts
 from .sym.sym_transform_parts import sym_transform_parts
 from .sklearntools import shrinkd
+from .sym.input_size import input_size
 
 class CrossValidatingEstimator(BaseDelegatingEstimator):
     def __init__(self, estimator, metric=None, cv=2, n_jobs=1, verbose=0, 
@@ -33,6 +34,9 @@ class CrossValidatingEstimator(BaseDelegatingEstimator):
     
     def sym_transform_parts(self, target=None):
         return sym_transform_parts(self.estimator_, target)
+    
+    def input_size(self):
+        return input_size(self.estimator_)
     
     def syms(self):
         return syms(self.estimator_)
