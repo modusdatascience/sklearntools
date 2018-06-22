@@ -425,7 +425,7 @@ class CalibratedEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
     
     def predict(self, X, exposure=None):
         est_prediction = self._estimator_predict(X, exposure)
-        cal_args = {'X': est_prediction}
+        cal_args = {'X': np.ravel(est_prediction)}
         if self.cal_exposure and exposure is not None:
             cal_args['exposure'] = exposure
         return self.calibrator_.predict(**cal_args)
@@ -579,8 +579,8 @@ class ProbaPredictingEstimator(DelegatingEstimator):
         self.estimator_.fit(X, y, *args, **kwargs)
         return self
     
-    def predict(self, X, *args, **kwargs):
-        return safer_call(self.estimator_.predict_proba, X, *args, **kwargs)[:, 1:]
+    def predict(self, X):
+        return safer_call(self.estimator_.predict_proba, X)[:, 1:]
     
     def sym_transform(self):
         return sym_transform(self.estimator_)

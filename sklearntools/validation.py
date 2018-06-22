@@ -112,7 +112,7 @@ def bin_window(n_bins):
 
 
 def plot_statistic(statistic, windower, orderer, covariate, observed, predicted, error_bar_lower=2.5, error_bar_upper=97.5, error_bar_n=500):
-    x = np.array(map(mean, windower(*orderer(covariate))))
+    x = np.array(list(map(mean, windower(*orderer(covariate)))))
     y = np.array(list(starmap(statistic, windower(*orderer(observed, predicted)))))
     y_lower = y - np.array(list(starmap(bootstrap(percentile(error_bar_lower), statistic, error_bar_n), windower(*orderer(observed, predicted)))))
     y_upper = np.array(list(starmap(bootstrap(percentile(error_bar_upper), statistic, error_bar_n), windower(*orderer(observed, predicted))))) - y
