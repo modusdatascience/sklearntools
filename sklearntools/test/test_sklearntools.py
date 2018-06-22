@@ -391,8 +391,8 @@ def test_model_selector():
 def test_cross_validating_estimator():
     np.random.seed(1)
     
-    m = 10000
-    n = 10
+    m = 1000
+    n = 5
     
     X = np.random.normal(size=(m,n))
     beta = np.random.normal(size=(n,1))

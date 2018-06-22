@@ -1,0 +1,19 @@
+name: sklearntoolsdev
+dependencies:
+    - python=3.6.2
+    - nose
+    - numpy
+    - sympy
+    - scikit-learn
+    - six
+    - pandas
+    - networkx
+    - mako
+    - statsmodels
+    - cython
+    - pip:
+        - toolz
+        - sklearn-contrib-py-earth
+        - git+ssh://git@github.com/jcrudy/sklearn2code.git
+        - git+ssh://git@github.com/jcrudy/sklearntoolsbase.git
+        - pyexecjs
