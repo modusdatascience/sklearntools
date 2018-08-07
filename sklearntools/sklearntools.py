@@ -8,6 +8,7 @@ import numpy as np
 from six import with_metaclass
 from functools import update_wrapper
 import sys
+from sklearn2code.sym.function import comp
 if sys.version_info[0] < 3:
     from inspect import getargspec
 else:
@@ -36,6 +37,7 @@ from operator import __add__, __mul__
 from nose.tools import assert_equal
 from pandas.core.indexing import IndexingError
 from six.moves import reduce
+from sklearn2code.sym.base import sym_predict as s2c_sym_predict, sym_transform as s2c_sym_transform, syms as s2c_syms
 # 
 # def if_delegate_has_method(*args, **kwargs):
 #     return decorator(sklearn_if_delegate_has_method(*args, **kwargs))
@@ -447,6 +449,30 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
         self._update(data)
         return safe_call(self.final_stage_.decision_function, data)
 
+@s2c_syms.register(StagedEstimator)
+def s2c_syms(estimator):
+    return s2c_syms(estimator.intermediate_stages_[0])
+
+@s2c_sym_transform.register(StagedEstimator)
+def s2c_sym_transform_staged_estimator(estimator):
+    '''
+    sklearn2code adapter
+    '''
+    try:
+        return comp(*map(s2c_sym_transform, estimator.intermediate_stages_))
+    except:
+        return comp(*map(s2c_sym_transform, estimator.intermediate_stages_))
+
+@s2c_sym_predict.register(StagedEstimator)
+def s2c_sym_predict_staged_estimator(estimator):
+    '''
+    sklearn2code adapter
+    '''
+    try:
+        return comp(s2c_sym_predict(estimator.final_stage_), s2c_sym_transform(estimator))
+    except:
+        return comp(s2c_sym_predict(estimator.final_stage_), s2c_sym_transform(estimator))
+    
 def staged(estimator):
     return StagedEstimator([estimator])
         

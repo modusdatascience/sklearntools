@@ -10,6 +10,12 @@ from .sym.sym_predict_parts import sym_predict_parts
 from .sym.sym_transform_parts import sym_transform_parts
 from .sklearntools import shrinkd
 from .sym.input_size import input_size
+from sklearn2code.sym.base import sym_predict as s2c_sym_predict
+from sklearn.model_selection._split import StratifiedKFold, BaseCrossValidator,\
+    KFold
+from _collections_abc import Iterable
+from six import with_metaclass
+from abc import ABCMeta, abstractmethod
 
 class CrossValidatingEstimator(BaseDelegatingEstimator):
     def __init__(self, estimator, metric=None, cv=2, n_jobs=1, verbose=0, 
@@ -89,3 +95,67 @@ class CrossValidatingEstimator(BaseDelegatingEstimator):
     def fit_predict(self, X, y=None, sample_weight=None, exposure=None):
         self.fit(X=X, y=y, sample_weight=sample_weight, exposure=exposure)
         return self.cv_predictions_.copy()
+
+@s2c_sym_predict.register(CrossValidatingEstimator)
+def s2c_sym_predict_cross_validating_estimator(estimator):
+    return s2c_sym_predict(estimator.estimator_)
+
+class ThresholdStratifiedKFold(object):
+    def __init__(self, thresholds, *args, **kwargs):
+        if isinstance(thresholds, Iterable):
+            self.thresholds = list(thresholds)
+        else:
+            self.thresholds = [thresholds]
+        self.stratified = StratifiedKFold(*args, **kwargs)
+    
+    def get_n_splits(self, *args,  **kwargs):
+        return self.stratified.get_n_splits(*args, **kwargs)
+    
+    def split(self, X, y):
+        y_thresh = np.zeros(y.shape)
+        for thresh in self.thresholds:
+            y_thresh += y >= thresh
+        for train, test in self.stratified.split(X, y_thresh):
+            yield train, test
+        
+class HybridCV(with_metaclass(ABCMeta, BaseCrossValidator)):
+    @abstractmethod
+    def choose_loo(self, y):
+        pass
+    
+    def __init__(self, n_folds, shuffle=True, **kwargs):
+        self.n_folds = n_folds
+        self.base_kfold = KFold(self.n_folds, shuffle=shuffle, **kwargs)
+    
+    @abstractmethod
+    def get_n_splits(self, X, y, groups):
+        pass
+    
+    def _iter_test_masks(self, X=None, y=None, groups=None):
+        loo_indices = self.choose_loo(X, y, groups)
+        not_loo_mask = np.ones(y.shape[0], dtype=bool)
+        for idx in loo_indices:
+            result = np.zeros(y.shape[0], dtype=bool)
+            result[idx] = True
+            not_loo_mask[idx] = False
+            yield result
+        for result in self.base_kfold._iter_test_masks(X=X, y=y, groups=groups):
+            yield (result & not_loo_mask)
+    
+class ThresholdHybridCV(HybridCV):
+    def __init__(self, n_folds, shuffle=True, lower=-np.inf, upper=np.inf, **kwargs):
+        HybridCV.__init__(self, n_folds=n_folds, shuffle=shuffle, **kwargs)
+        self.lower = lower
+        self.upper = upper
+    
+    def get_n_splits(self, X, y, groups=None):
+        return np.sum((y > self.upper) | (y < self.lower)) + self.n_folds
+    
+    def choose_loo(self, X, y, groups):
+        return np.where((y > self.upper) | (y < self.lower))[0]
+    
+    
+    
+
+
+

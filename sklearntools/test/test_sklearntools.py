@@ -5,7 +5,7 @@ Created on Feb 23, 2016
 '''
 import numpy as np
 from sklearntools.sklearntools import StagedEstimator, MaskedEstimator,\
-    ColumnSubsetTransformer, NonNullSubsetFitter
+    ColumnSubsetTransformer, NonNullSubsetFitter, safe_assign_column
 from sklearn.linear_model.base import LinearRegression
 from sklearn.linear_model.logistic import LogisticRegression
 from sklearntools.calibration import CalibratedEstimatorCV, ResponseTransformingEstimator,\
@@ -28,8 +28,14 @@ from sklearntools.earth import Earth
 from sklearntools.kfold import CrossValidatingEstimator
 from sklearn.metrics.regression import r2_score
 from sklearn.model_selection import KFold
+from nose.tools import assert_list_equal
 warnings.simplefilter("error")
-    
+
+def test_safe_assign_column():
+    data = pandas.DataFrame({'A': [1,2,3], 'B': [4,5,6]})
+    safe_assign_column(data, 'A', [7,8,9])
+    assert_list_equal(list(sorted(data.columns)), ['A', 'B'])
+
 def test_single_elimination_feature_importance_estimator_cv():
     np.random.seed(0)
     m = 100000
