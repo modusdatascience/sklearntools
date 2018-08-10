@@ -76,6 +76,10 @@ def safer_call(fn, *args, **kwargs):
             kwargs[name] = arg
             args = []
     if spec.keywords is None:
+        if 'X' in kwargs and 'X' not in spec_args:
+            if 'data' in spec_args and 'data' not in kwargs:
+                kwargs['data'] = kwargs['X']
+                del kwargs['X']
         for name in list(kwargs.keys()):
             if name not in spec_args:
                 del kwargs[name]
