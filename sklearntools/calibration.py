@@ -6,12 +6,12 @@ from sklearn.cross_validation import check_cv
 from sklearn.externals.joblib.parallel import Parallel, delayed
 import numpy as np
 from sklearn.utils.metaestimators import if_delegate_has_method
-from .sym.sym_transform import sym_transform
-from .sym.sym_predict import sym_predict
-from .sym.sym_predict_proba import sym_predict_proba
-from .sym.syms import syms
-from .sym.sym_predict_parts import sym_predict_parts
-from .sym.sym_transform_parts import sym_transform_parts
+# from .sym.sym_transform import sym_transform
+# from .sym.sym_predict import sym_predict
+# from .sym.sym_predict_proba import sym_predict_proba
+# from .sym.syms import syms
+# from .sym.sym_predict_parts import sym_predict_parts
+# from .sym.sym_transform_parts import sym_transform_parts
 from .sklearntools import safe_assign_subset, _fit_and_predict, safer_call
 from sympy.core.symbol import Symbol
 from numpy import inf
@@ -21,7 +21,7 @@ from sympy.core.numbers import RealNumber
 from sympy.functions.elementary.miscellaneous import Max
 from .sklearntools import shrinkd
 from sklearn.isotonic import IsotonicRegression
-from .sym.input_size import input_size
+# from .sym.input_size import input_size
 
 # def _fit_and_predict(estimator, X, y, train, test, sample_weight=None, exposure=None):
 #     '''
@@ -79,14 +79,14 @@ class ThresholdClassifier(STSimpleEstimator, MetaEstimatorMixin):
             clas_args['exposure'] = exposure
         return safe_call(self.classifier_.predict_proba, clas_args)
     
-    def sym_predict(self):
-        return sym_predict(self.classifier_)
-    
-    def syms(self):
-        return syms(self.classifier_)
-    
-    def sym_predict_proba(self):
-        return sym_predict_proba(self.classifier_)
+#     def sym_predict(self):
+#         return sym_predict(self.classifier_)
+#     
+#     def syms(self):
+#         return syms(self.classifier_)
+#     
+#     def sym_predict_proba(self):
+#         return sym_predict_proba(self.classifier_)
     
     @if_delegate_has_method(delegate='classifier')
     def predict_log_proba(self, X, exposure=None):
@@ -129,11 +129,11 @@ class MovingAverageSmoothingEstimator(DelegatingEstimator):
         self.sort_algorithm = sort_algorithm
         self._create_delegates('estimator', non_fit_methods)
         
-    def sym_predict(self):
-        return sym_predict(self.estimator_)
-    
-    def syms(self):
-        return syms(self.estimator_)
+#     def sym_predict(self):
+#         return sym_predict(self.estimator_)
+#     
+#     def syms(self):
+#         return syms(self.estimator_)
         
     def fit(self, X, y):
 #         if sample_weight is not None:
@@ -263,20 +263,20 @@ class PredictorTransformer(DelegatingEstimator):
         else:
             return result
         
-    def syms(self):
-        return syms(self.estimator_)
-    
-    def sym_transform(self):
-        return [sym_predict(self)]
-    
-    def sym_predict(self):
-        return sym_predict(self.estimator_)
-    
-    def sym_transform_parts(self, target=None):
-        return sym_predict_parts(self, target)
-    
-    def sym_predict_parts(self, target=None):
-        return sym_predict_parts(self.estimator_, target)
+#     def syms(self):
+#         return syms(self.estimator_)
+#     
+#     def sym_transform(self):
+#         return [sym_predict(self)]
+#     
+#     def sym_predict(self):
+#         return sym_predict(self.estimator_)
+#     
+#     def sym_transform_parts(self, target=None):
+#         return sym_predict_parts(self, target)
+#     
+#     def sym_predict_parts(self, target=None):
+#         return sym_predict_parts(self.estimator_, target)
     
 class SelectorTransformer(STSimpleEstimator):
     '''
@@ -301,8 +301,8 @@ class SelectorTransformer(STSimpleEstimator):
     def transform(self, X, exposure=None):
         return safe_col_select(X, self.columns)
     
-    def sym_transform_parts(self, target=None):
-        return (syms(self), sym_transform(self), target)
+#     def sym_transform_parts(self, target=None):
+#         return (syms(self), sym_transform(self), target)
     
     def syms(self):
         if hasattr(self, 'inputs_'):
@@ -335,25 +335,25 @@ class CalibratedEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
         self.verbose = verbose
         self.pre_dispatch = pre_dispatch
     
-    def syms(self):
-        return syms(self.estimator_)
-    
-    def sym_predict(self):
-        est = sym_predict(self.estimator_)
-        cal = sym_predict(self.calibrator_)
-        cal_vars = syms(self.calibrator_)
-        assert len(cal_vars) == 1
-        return cal.subs(cal_vars[0], est)
-    
-    def sym_predict_parts(self, target=None):
-        parts = sym_predict_parts(self.calibrator_, target)
-        return sym_predict_parts(self.estimator_, parts)
-    
-    def sym_transform_parts(self, target=None):
-        return sym_transform_parts(self.estimator_, target)
-    
-    def sym_transform(self):
-        return sym_transform(self.estimator_)
+#     def syms(self):
+#         return syms(self.estimator_)
+#     
+#     def sym_predict(self):
+#         est = sym_predict(self.estimator_)
+#         cal = sym_predict(self.calibrator_)
+#         cal_vars = syms(self.calibrator_)
+#         assert len(cal_vars) == 1
+#         return cal.subs(cal_vars[0], est)
+#     
+#     def sym_predict_parts(self, target=None):
+#         parts = sym_predict_parts(self.calibrator_, target)
+#         return sym_predict_parts(self.estimator_, parts)
+#     
+#     def sym_transform_parts(self, target=None):
+#         return sym_transform_parts(self.estimator_, target)
+#     
+#     def sym_transform(self):
+#         return sym_transform(self.estimator_)
     
     @property
     def _estimator_type(self):
@@ -582,17 +582,17 @@ class ProbaPredictingEstimator(DelegatingEstimator):
     def predict(self, X):
         return safer_call(self.estimator_.predict_proba, X)[:, 1:]
     
-    def sym_transform(self):
-        return sym_transform(self.estimator_)
-    
-    def sym_predict(self):
-        return sym_predict_proba(self.estimator_)
-    
-    def syms(self):
-        return syms(self.estimator_)
-    
-    def input_size(self):
-        return input_size(self.estimator_)
+#     def sym_transform(self):
+#         return sym_transform(self.estimator_)
+#     
+#     def sym_predict(self):
+#         return sym_predict_proba(self.estimator_)
+#     
+#     def syms(self):
+#         return syms(self.estimator_)
+#     
+#     def input_size(self):
+#         return input_size(self.estimator_)
     
 class ResponseTransformingEstimator(DelegatingEstimator):
     def __init__(self, estimator, transformer, est_weight=False, est_exposure=False, trans_weight=False,
@@ -605,20 +605,20 @@ class ResponseTransformingEstimator(DelegatingEstimator):
         self.trans_exposure = trans_exposure
         self._create_delegates('estimator', ['predict', 'transform', 'predict_proba', 
                                              'predict_log_proba', 'decision_function'])
-    def syms(self):
-        return syms(self.estimator_)
-    
-    def sym_predict_parts(self, target=None):
-        return sym_predict_parts(self.estimator_, target)
-    
-    def sym_transform_parts(self, target=None):
-        return sym_transform_parts(self.estimator_, target)
-    
-    def sym_predict(self):
-        return sym_predict(self.estimator_)
-    
-    def sym_transform(self):
-        return sym_transform(self.estimator_)
+#     def syms(self):
+#         return syms(self.estimator_)
+#     
+#     def sym_predict_parts(self, target=None):
+#         return sym_predict_parts(self.estimator_, target)
+#     
+#     def sym_transform_parts(self, target=None):
+#         return sym_transform_parts(self.estimator_, target)
+#     
+#     def sym_predict(self):
+#         return sym_predict(self.estimator_)
+#     
+#     def sym_transform(self):
+#         return sym_transform(self.estimator_)
     
     @property
     def _estimator_type(self):

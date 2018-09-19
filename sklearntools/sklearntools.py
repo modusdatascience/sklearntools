@@ -18,18 +18,18 @@ else:
     def getargspec(*args, **kwargs):
         return ArgSpec(*getfullargspec(*args, **kwargs)[:4])
         
-from .sym.syms import syms
-from .sym.sym_update import sym_update
-from .sym.sym_predict import sym_predict
-from .sym.sym_transform_parts import sym_transform_parts
-from .sym.sym_predict_parts import sym_predict_parts
-from .sym.sym_predict_proba import sym_predict_proba
+# from .sym.syms import syms
+# from .sym.sym_update import sym_update
+# from .sym.sym_predict import sym_predict
+# from .sym.sym_transform_parts import sym_transform_parts
+# from .sym.sym_predict_parts import sym_predict_parts
+# from .sym.sym_predict_proba import sym_predict_proba
 import pandas
 from sympy.functions.elementary.miscellaneous import Max, Min
 from sympy.core.numbers import RealNumber
 from itertools import chain, starmap
-from .sym.sym_transform import sym_transform
-from sympy.core.symbol import Symbol
+# from .sym.sym_transform import sym_transform
+# from sympy.core.symbol import Symbol
 from . import __version__
 from toolz.functoolz import curry
 from sklearn.exceptions import NotFittedError
@@ -335,36 +335,36 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
             except AttributeError:
                 data['X'] = safe_call(stage.transform, self._transform_args(data))
     
-    def sym_transform_parts(self, target=None):
-        parts = target
-        for stage in reversed(self.intermediate_stages_):
-            try:
-                parts = sym_transform_parts(stage, target=parts)
-            except:
-                parts = sym_transform_parts(stage, target=parts)
-        return parts
-#         parts = sym_transform_parts(self.intermediate_stages_[0])
+#     def sym_transform_parts(self, target=None):
+#         parts = target
 #         for stage in reversed(self.intermediate_stages_):
-#             parts = (syms(stage), sym_transform(stage), parts)
+#             try:
+#                 parts = sym_transform_parts(stage, target=parts)
+#             except:
+#                 parts = sym_transform_parts(stage, target=parts)
 #         return parts
-    
-    def sym_predict_parts(self, target=None):
-        parts = sym_predict_parts(self.final_stage_, target)
-        return sym_transform_parts(self, target=parts)
-        
-    def _sym_update(self):
-        expressions = None
-        for stage in self.intermediate_stages_:
-            stage_expressions = sym_update(stage)
-            if expressions is not None:
-                new_expressions = []
-                inputs = syms(stage)
-                for expr in stage_expressions:
-                    new_expressions.append(expr.subs(dict(zip(inputs, expressions))))
-                expressions = new_expressions
-            else:
-                expressions = stage_expressions
-        return expressions
+# #         parts = sym_transform_parts(self.intermediate_stages_[0])
+# #         for stage in reversed(self.intermediate_stages_):
+# #             parts = (syms(stage), sym_transform(stage), parts)
+# #         return parts
+#     
+#     def sym_predict_parts(self, target=None):
+#         parts = sym_predict_parts(self.final_stage_, target)
+#         return sym_transform_parts(self, target=parts)
+#         
+#     def _sym_update(self):
+#         expressions = None
+#         for stage in self.intermediate_stages_:
+#             stage_expressions = sym_update(stage)
+#             if expressions is not None:
+#                 new_expressions = []
+#                 inputs = syms(stage)
+#                 for expr in stage_expressions:
+#                     new_expressions.append(expr.subs(dict(zip(inputs, expressions))))
+#                 expressions = new_expressions
+#             else:
+#                 expressions = stage_expressions
+#         return expressions
     
     def fit_update(self, data):
         self.intermediate_stages_ = []
@@ -397,33 +397,33 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
         self._update(data)
         return safe_call(self.final_stage_.transform, data)
     
-    def sym_predict(self):
-        expressions = self._sym_update()
-        expression = sym_predict(self.final_stage_)
-        symbols =  syms(self.final_stage_)
-        expression = expression.subs(dict(zip(symbols, expressions)))
-#         for expr, sym in zip(expressions, symbols):
-#             expression = expression.subs(sym, expr)
-        return expression
-    
-    def sym_predict_proba(self):
-        expressions = self._sym_update()
-        expression = sym_predict_proba(self.final_stage_)
-        symbols =  syms(self.final_stage_)
-        expression = expression.subs(dict(zip(symbols, expressions)))
-#         for expr, sym in zip(expressions, symbols):
-#             expression = expression.subs(sym, expr)
-        return expression
-    
-    def sym_transform(self):
-        expressions = self._sym_update()
-        final_expressions = sym_transform(self.final_stage_)
-        symbols =  syms(self.final_stage_)
-        final_expressions = list(map(lambda x: x.subs(dict(zip(symbols, expressions))), final_expressions))
-        return final_expressions
-    
-    def syms(self):
-        return syms(self.intermediate_stages_[0])
+#     def sym_predict(self):
+#         expressions = self._sym_update()
+#         expression = sym_predict(self.final_stage_)
+#         symbols =  syms(self.final_stage_)
+#         expression = expression.subs(dict(zip(symbols, expressions)))
+# #         for expr, sym in zip(expressions, symbols):
+# #             expression = expression.subs(sym, expr)
+#         return expression
+#     
+#     def sym_predict_proba(self):
+#         expressions = self._sym_update()
+#         expression = sym_predict_proba(self.final_stage_)
+#         symbols =  syms(self.final_stage_)
+#         expression = expression.subs(dict(zip(symbols, expressions)))
+# #         for expr, sym in zip(expressions, symbols):
+# #             expression = expression.subs(sym, expr)
+#         return expression
+#     
+#     def sym_transform(self):
+#         expressions = self._sym_update()
+#         final_expressions = sym_transform(self.final_stage_)
+#         symbols =  syms(self.final_stage_)
+#         final_expressions = list(map(lambda x: x.subs(dict(zip(symbols, expressions))), final_expressions))
+#         return final_expressions
+#     
+#     def syms(self):
+#         return syms(self.intermediate_stages_[0])
     
     def predict(self, X, exposure=None):
         data = self._process_args(X=X, exposure=exposure)
@@ -535,18 +535,18 @@ class LinearCombination(STSimpleEstimator, MetaEstimatorMixin):
     def fit(self, X, y=None, sample_weight=None, exposure=None):
         raise NotImplementedError('Linear combinations should only be created after fitting.')
     
-    def syms(self):
-        result = syms(self.estimators[-1])
-        for est in self.estimators:
-            try:
-                check = syms(est)
-            except AttributeError:
-                continue
-            assert_equal(result, check)
-        return result
-    
-    def sym_predict(self):
-        return reduce(__add__, starmap(__mul__, zip(self.coefficients, map(sym_predict, self.estimators))))
+#     def syms(self):
+#         result = syms(self.estimators[-1])
+#         for est in self.estimators:
+#             try:
+#                 check = syms(est)
+#             except AttributeError:
+#                 continue
+#             assert_equal(result, check)
+#         return result
+#     
+#     def sym_predict(self):
+#         return reduce(__add__, starmap(__mul__, zip(self.coefficients, map(sym_predict, self.estimators))))
     
     def predict(self, X, exposure=None):
         data = self._process_args(X=X, exposure=exposure)
@@ -784,29 +784,29 @@ class BoundedEstimator(DelegatingEstimator):
         self._create_delegates('estimator', ['fit', 'predict_proba', 'decision_function', 
                          'predict_log_proba', 'transform'])
     
-    def syms(self):
-        return syms(self.estimator_)
-    
-    def sym_predict_parts(self, target=None):
-        sym = Symbol('x')
-        expr = sym
-        if self.lower_bound > float('-inf'):
-            expr = Max(expr, RealNumber(self.lower_bound))
-        if self.upper_bound < float('inf'):
-            expr = Min(expr, RealNumber(self.upper_bound))
-        parts = ([sym], [expr], target)
-        return sym_predict_parts(self.estimator_, parts)
-    
-    def sym_transform_parts(self, target=None):
-        return sym_transform_parts(self.estimator_, target)
-    
-    def sym_predict(self):
-        result = sym_predict(self.estimator_)
-        if self.lower_bound > float('-inf'):
-            result = Max(result, RealNumber(self.lower_bound))
-        if self.upper_bound < float('inf'):
-            result = Min(result, RealNumber(self.upper_bound))
-        return result
+#     def syms(self):
+#         return syms(self.estimator_)
+#     
+#     def sym_predict_parts(self, target=None):
+#         sym = Symbol('x')
+#         expr = sym
+#         if self.lower_bound > float('-inf'):
+#             expr = Max(expr, RealNumber(self.lower_bound))
+#         if self.upper_bound < float('inf'):
+#             expr = Min(expr, RealNumber(self.upper_bound))
+#         parts = ([sym], [expr], target)
+#         return sym_predict_parts(self.estimator_, parts)
+#     
+#     def sym_transform_parts(self, target=None):
+#         return sym_transform_parts(self.estimator_, target)
+#     
+#     def sym_predict(self):
+#         result = sym_predict(self.estimator_)
+#         if self.lower_bound > float('-inf'):
+#             result = Max(result, RealNumber(self.lower_bound))
+#         if self.upper_bound < float('inf'):
+#             result = Min(result, RealNumber(self.upper_bound))
+#         return result
     
     def predict(self, X, exposure=None):
         data = self._process_args(X=X, exposure=exposure)
@@ -1067,51 +1067,51 @@ class MultiEstimator(STSimpleEstimator, MetaEstimatorMixin):
             self.estimators_.append(clone(estimator).fit(**args))
         return self
     
-    def sym_transform_parts(self, target=None):
-        inputs = syms(self)
-        expressions = []
-        for est in self.estimators_:
-#             parts = sym_transform_parts(est, None)
-#             if inputs != parts[0]:
+#     def sym_transform_parts(self, target=None):
+#         inputs = syms(self)
+#         expressions = []
+#         for est in self.estimators_:
+# #             parts = sym_transform_parts(est, None)
+# #             if inputs != parts[0]:
+# #                 inpset = set(inputs)
+# #                 partset = set(parts[0])
+# #                 if inpset < partset:
+# #                     inputs = parts[0]
+# #                 elif partset < inpset:
+# #                     pass
+# #                 else:
+# #                     raise ValueError('Inputs not compatible in multiestimator')
+#                 
+#             expressions.extend(sym_transform(est))
+#         return (inputs, expressions, target)
+#     
+#     def sym_predict_parts(self, target=None):
+#         inputs = syms(self.estimators_[0])
+#         expressions = []
+#         for est in self.estimators_:
+#             parts = sym_predict_parts(est, None)
+#             assert inputs == parts[0]
+#             expressions.extend(parts[1])
+#         return (inputs, expressions, target)
+#         
+#     def syms(self):
+#         inputs = syms(self.estimators_[0])
+#         for est in self.estimators_:
+#             new_inputs = syms(est)
+#             if inputs != new_inputs:
 #                 inpset = set(inputs)
-#                 partset = set(parts[0])
+#                 partset = set(new_inputs)
 #                 if inpset < partset:
-#                     inputs = parts[0]
+#                     inputs = new_inputs
 #                 elif partset < inpset:
 #                     pass
 #                 else:
 #                     raise ValueError('Inputs not compatible in multiestimator')
-                
-            expressions.extend(sym_transform(est))
-        return (inputs, expressions, target)
+#         return inputs
+# #         return list(set(chain(*map(syms, self.estimators_))))
     
-    def sym_predict_parts(self, target=None):
-        inputs = syms(self.estimators_[0])
-        expressions = []
-        for est in self.estimators_:
-            parts = sym_predict_parts(est, None)
-            assert inputs == parts[0]
-            expressions.extend(parts[1])
-        return (inputs, expressions, target)
-        
-    def syms(self):
-        inputs = syms(self.estimators_[0])
-        for est in self.estimators_:
-            new_inputs = syms(est)
-            if inputs != new_inputs:
-                inpset = set(inputs)
-                partset = set(new_inputs)
-                if inpset < partset:
-                    inputs = new_inputs
-                elif partset < inpset:
-                    pass
-                else:
-                    raise ValueError('Inputs not compatible in multiestimator')
-        return inputs
-#         return list(set(chain(*map(syms, self.estimators_))))
-    
-    def sym_transform(self):
-        return list(chain(*map(sym_transform, self.estimators_)))
+#     def sym_transform(self):
+#         return list(chain(*map(sym_transform, self.estimators_)))
     
     def transform(self, X, y=None, sample_weight=None, exposure=None):
         args = self._process_args(X=X, exposure=exposure)

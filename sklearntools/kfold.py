@@ -4,12 +4,12 @@ from sklearn.cross_validation import check_cv
 from sklearn.base import is_classifier, clone
 from .sklearntools import _fit_and_predict, non_fit_methods, BaseDelegatingEstimator, safe_assign_subset, safer_call
 import numpy as np
-from .sym.sym_predict import sym_predict
-from .sym.syms import syms
-from .sym.sym_predict_parts import sym_predict_parts
-from .sym.sym_transform_parts import sym_transform_parts
+# from .sym.sym_predict import sym_predict
+# from .sym.syms import syms
+# from .sym.sym_predict_parts import sym_predict_parts
+# from .sym.sym_transform_parts import sym_transform_parts
 from .sklearntools import shrinkd
-from .sym.input_size import input_size
+# from .sym.input_size import input_size
 from sklearn2code.sym.base import sym_predict as s2c_sym_predict
 from sklearn.model_selection._split import StratifiedKFold, BaseCrossValidator,\
     KFold
@@ -32,20 +32,20 @@ class CrossValidatingEstimator(BaseDelegatingEstimator):
     def _estimator_type(self):
         return self.estimator._estimator_type
     
-    def sym_predict(self):
-        return sym_predict(self.estimator_)
-    
-    def sym_predict_parts(self, target=None):
-        return sym_predict_parts(self.estimator_, target)
-    
-    def sym_transform_parts(self, target=None):
-        return sym_transform_parts(self.estimator_, target)
-    
-    def input_size(self):
-        return input_size(self.estimator_)
-    
-    def syms(self):
-        return syms(self.estimator_)
+#     def sym_predict(self):
+#         return sym_predict(self.estimator_)
+#     
+#     def sym_predict_parts(self, target=None):
+#         return sym_predict_parts(self.estimator_, target)
+#     
+#     def sym_transform_parts(self, target=None):
+#         return sym_transform_parts(self.estimator_, target)
+#     
+#     def input_size(self):
+#         return input_size(self.estimator_)
+#     
+#     def syms(self):
+#         return syms(self.estimator_)
     
     def fit(self, X, y=None, sample_weight=None, exposure=None):
         # For later
