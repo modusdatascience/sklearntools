@@ -12,7 +12,8 @@ from sympy.core.relational import Eq
 from operator import __or__, methodcaller, __ge__
 from toolz.functoolz import curry, compose
 from six import string_types
-from sklearn2code.sym.base import sym_predict as s2c_sym_predict, sym_transform as s2c_sym_transform, syms as s2c_syms
+from sklearn2code.sym.base import sym_predict as s2c_sym_predict, \
+    sym_transform as s2c_sym_transform, syms as s2c_syms, sym_predict_proba as s2c_sym_predict_proba
 from sklearn2code.dispatching import call_method_or_dispatch
 from sklearn2code.sym.expression import RealNumber as S2CRealNumber,\
     RealVariable, RealPiecewise, true, Log as S2CLog, MinReal, LessReal,\
@@ -21,6 +22,7 @@ from sklearn2code.sym.expression import RealNumber as S2CRealNumber,\
 from sklearn2code.sym.function import Function
 from collections import OrderedDict
 from _collections import defaultdict
+from sklearn.base import clone
 
 sym_col_trans = call_method_or_dispatch('sym_col_trans', docstring='')
 
@@ -396,13 +398,17 @@ def sym_uncensor(estimator):
     return RealPiecewise((right, IsNan(left)), (left, true))
 
 class VariableTransformer(STSimpleEstimator):
-    def __init__(self, transformations, strict=False):
+    def __init__(self, transformations, strict=False, exclusive=False):
         '''
         strict : (bool) If True, fail on missing inputs.  If False, just
         skip them.
+        
+        exclusive : (bool) If True, output only the results of transformations and
+        not the original input data.
         '''
         self.transformations = transformations
         self.strict = strict
+        self.exclusive = exclusive
     
     def fit(self, X, y=None, exposure=None, xlabels=None):
         if xlabels is not None:
@@ -416,7 +422,10 @@ class VariableTransformer(STSimpleEstimator):
         return self
     
     def transform(self, X, offset=None, exposure=None):
-        result = X.copy()
+        if self.exclusive:
+            result = type(X)()
+        else:
+            result = X.copy()
         for k, v in self.clean_transformations_.items():
             safe_assign_column(result, k, v.transform(X))
         return result
@@ -435,6 +444,84 @@ class VariableTransformer(STSimpleEstimator):
 #             else:
 #                 result.append(sym)
 #         return result
+
+class TransformingEstimator(STSimpleEstimator):
+    def __init__(self, estimator, x_transformer=None, y_transformer=None, 
+                 exposure_transformer=None, weight_transformer=None):
+        self.estimator = estimator
+        self.x_transformer = x_transformer
+        self.y_transformer = y_transformer
+        self.exposure_transformer = exposure_transformer
+        self.weight_transformer = weight_transformer
+    
+    def _internal_transform(self, X, include_response):
+        args = {}
+        if self.x_transformer is None:
+            args['X'] = X
+        else:
+            args['X'] = self.x_transformer_.transform(X)
+        if self.exposure_transformer is not None:
+            args['exposure'] = self.exposure_transformer_.transform(X)
+        if include_response:
+            if self.y_transformer is not None:
+                args['y'] = self.y_transformer_.transform(X)
+            if self.weight_transformer is not None:
+                args['sample_weight'] = self.weight_transformer_.transform(X)
+        return args
+    
+    def fit(self, X):
+        if self.x_transformer is not None:
+            self.x_transformer_ = clone(self.x_transformer).fit(X)
+        if self.y_transformer is not None:
+            self.y_transformer_ = clone(self.y_transformer).fit(X)
+        if self.exposure_transformer is not None:
+            self.exposure_transformer_ = clone(self.exposure_transformer).fit(X)
+        if self.weight_transformer is not None:
+            self.weight_transformer_ = clone(self.weight_transformer).fit(X)
+        args = self._internal_transform(X, True)
+        self.estimator_ = clone(self.estimator).fit(**args)
+        return self
+    
+    def transform(self, X):
+        args = self._internal_transform(X, False)
+        return self.estimator_.transform(**args)
+    
+    def predict(self, X):
+        args = self._internal_transform(X, False)
+        return self.estimator_.predict(**args)
+    
+    def predict_proba(self, X):
+        args = self._internal_transform(X, False)
+        return self.estimator_.predict_proba(**args)
+    
+
+@s2c_syms.register(TransformingEstimator)
+def syms_transforming_estimator(estimator):
+    if estimator.x_transformer is None:
+        return s2c_syms(estimator.estimator_)
+    else:
+        return s2c_syms(estimator.x_transformer_)
+
+@s2c_sym_transform.register(TransformingEstimator)
+def sym_transform_transforming_estimator(estimator):
+    if estimator.x_transformer is None:
+        return s2c_sym_transform(estimator.estimator_)
+    else:
+        return s2c_sym_transform(estimator.estimator_).compose(s2c_sym_transform(estimator.x_transformer_))
+
+@s2c_sym_predict.register(TransformingEstimator)
+def sym_predict_tranforming_estimator(estimator):
+    if estimator.x_transformer is None:
+        return s2c_sym_predict(estimator.estimator_)
+    else:
+        return s2c_sym_predict(estimator.estimator_).compose(s2c_sym_transform(estimator.x_transformer_))
+
+@s2c_sym_predict_proba.register(TransformingEstimator)
+def sym_predict_proba_tranforming_estimator(estimator):
+    if estimator.x_transformer is None:
+        return s2c_sym_predict_proba(estimator.estimator_)
+    else:
+        return s2c_sym_predict_proba(estimator.estimator_).compose(s2c_sym_transform(estimator.x_transformer_))
 
 @s2c_syms.register(VariableTransformer)
 def syms_variable_transformer(estimator):
