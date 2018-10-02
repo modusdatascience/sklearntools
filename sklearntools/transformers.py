@@ -2,7 +2,7 @@ from .sklearntools import STSimpleEstimator, safe_assign_subset, safe_column_nam
     safe_column_select, safe_assign_column
 from abc import ABCMeta, abstractmethod
 from sympy.core.symbol import Symbol
-from toolz.dicttoolz import keymap, valmap, itemmap, valfilter
+from toolz.dicttoolz import keymap, itemmap, valfilter
 from sympy.functions.elementary.piecewise import Piecewise
 from sympy.core.numbers import RealNumber, One, Zero
 import numpy as np
@@ -17,12 +17,13 @@ from sklearn2code.sym.base import sym_predict as s2c_sym_predict, \
 from sklearn2code.dispatching import call_method_or_dispatch
 from sklearn2code.sym.expression import RealNumber as S2CRealNumber,\
     RealVariable, RealPiecewise, true, Log as S2CLog, MinReal, LessReal,\
-    LessEqualReal, GreaterReal, GreaterEqualReal, MaxReal, RealPowerReal, nan,\
+    LessEqualReal, GreaterReal, GreaterEqualReal, MaxReal, nan,\
     IsNan
 from sklearn2code.sym.function import Function
-from collections import OrderedDict
 from _collections import defaultdict
 from sklearn.base import clone
+from six.moves import reduce
+from sklearntools.adapters import predict
 
 sym_col_trans = call_method_or_dispatch('sym_col_trans', docstring='')
 
@@ -410,6 +411,9 @@ class VariableTransformer(STSimpleEstimator):
         self.strict = strict
         self.exclusive = exclusive
     
+    def inputs(self):
+        return reduce(__or__, map(methodcaller('inputs'), self.transformations.values()))
+    
     def fit(self, X, y=None, exposure=None, xlabels=None):
         if xlabels is not None:
             self.xlabels_ = xlabels
@@ -454,6 +458,12 @@ class TransformingEstimator(STSimpleEstimator):
         self.exposure_transformer = exposure_transformer
         self.weight_transformer = weight_transformer
     
+    def inputs(self):
+        return self.x_transformer.inputs()
+    
+    def outputs(self):
+        return self.y_transformer.inputs()
+    
     def _internal_transform(self, X, include_response):
         args = {}
         if self.x_transformer is None:
@@ -479,7 +489,10 @@ class TransformingEstimator(STSimpleEstimator):
         if self.weight_transformer is not None:
             self.weight_transformer_ = clone(self.weight_transformer).fit(X)
         args = self._internal_transform(X, True)
-        self.estimator_ = clone(self.estimator).fit(**args)
+        try:
+            self.estimator_ = clone(self.estimator).fit(**args)
+        except:
+            self.estimator_ = clone(self.estimator).fit(**args)
         return self
     
     def transform(self, X):
@@ -488,7 +501,11 @@ class TransformingEstimator(STSimpleEstimator):
     
     def predict(self, X):
         args = self._internal_transform(X, False)
-        return self.estimator_.predict(**args)
+        return predict(self.estimator_, **args)
+#         try:
+#             return self.estimator_.predict(**args)
+#         except:
+#             return self.estimator_.predict(**args)
     
     def predict_proba(self, X):
         args = self._internal_transform(X, False)

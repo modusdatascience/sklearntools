@@ -16,6 +16,7 @@ from sklearn.model_selection._split import StratifiedKFold, BaseCrossValidator,\
 from _collections_abc import Iterable
 from six import with_metaclass
 from abc import ABCMeta, abstractmethod
+from toolz.curried import valmap
 
 class CrossValidatingEstimator(BaseDelegatingEstimator):
     def __init__(self, estimator, metric=None, cv=2, n_jobs=1, verbose=0, 
@@ -61,11 +62,18 @@ class CrossValidatingEstimator(BaseDelegatingEstimator):
             cv = no_cv(X=X, y=y)
         else:
             if hasattr(self.cv, 'split'):
-                cv = self.cv.split(X, np.ravel(y))
+                cv_args = dict(X=X)
+                if y is not None:
+                    cv_args['y'] = np.ravel(y)
+                cv = self.cv.split(**cv_args)
             else:
-                cv = check_cv(self.cv, X=X, y=shrinkd(1,np.asarray(y)), classifier=is_classifier(self.estimator))
+                cv_args = dict(X=X)
+                if y is not None:
+                    cv_args['y'] = shrinkd(1,np.asarray(y))
+                cv = check_cv(self.cv, classifier=is_classifier(self.estimator), **cv_args)
                 
         # Do the cross validation fits
+        print(valmap(lambda x: x.shape, fit_args))
         cv_fits = parallel(delayed(_fit_and_predict)(clone(self.estimator), fit_args, train, test) for train, test in cv)
         
         # Combine predictions from cv fits
@@ -133,15 +141,37 @@ class HybridCV(with_metaclass(ABCMeta, BaseCrossValidator)):
     
     def _iter_test_masks(self, X=None, y=None, groups=None):
         loo_indices = self.choose_loo(X, y, groups)
-        not_loo_mask = np.ones(y.shape[0], dtype=bool)
+        not_loo_mask = np.ones(X.shape[0], dtype=bool)
         for idx in loo_indices:
-            result = np.zeros(y.shape[0], dtype=bool)
+            result = np.zeros(X.shape[0], dtype=bool)
             result[idx] = True
             not_loo_mask[idx] = False
             yield result
         for result in self.base_kfold._iter_test_masks(X=X, y=y, groups=groups):
-            yield (result & not_loo_mask)
+            result_ = (result & not_loo_mask)
+            if np.any(result_!=0):
+                return result_
     
+def all_false_predicate(X, y=None, groups=None):
+    return np.zeros(shape=X.shape[0], dtype=bool)
+
+def column_interval_predicate(colname, lower=-np.inf, upper=np.inf):
+    def _column_interval_predicate(X, y=None, groups=None):
+        z = np.ravel(X[colname])
+        return (z > upper) | (z < lower)
+    return _column_interval_predicate
+        
+class PredicateHybridCV(HybridCV):
+    def __init__(self, n_folds, shuffle=True, predicate=all_false_predicate, **kwargs):
+        HybridCV.__init__(self, n_folds=n_folds, shuffle=shuffle, **kwargs)
+        self.predicate=predicate
+    
+    def get_n_splits(self, X, y=None, groups=None):
+        return np.sum(self.predicate(X, y, groups)) + self.n_folds
+    
+    def choose_loo(self, X, y=None, groups=None):
+        return np.where(self.predicate(X, y, groups))[0]
+        
 class ThresholdHybridCV(HybridCV):
     def __init__(self, n_folds, shuffle=True, lower=-np.inf, upper=np.inf, **kwargs):
         HybridCV.__init__(self, n_folds=n_folds, shuffle=shuffle, **kwargs)
