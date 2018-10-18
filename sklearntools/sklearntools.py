@@ -199,9 +199,13 @@ def _fit_and_score(estimator, data, scorer, train, test):
     score = safer_call(scorer, estimator_, **test_data)
     return (score, np.sum(test), estimator_)
 
-def _fit_and_predict(estimator, data, train, test):
+def _fit_and_predict(estimator, data, train, test, verbose=False):
     train_data = _subset_data(data, train)
+    if verbose > 0:
+        print('Fitting inner estimator...')
     estimator_ = clone(estimator).fit(**train_data)
+    if verbose > 0:
+        print('Fitting inner estimator complete.')
     test_data = _subset_data(data, test)
     prediction = safer_call(estimator_.predict, **test_data)
     return estimator_, prediction, test

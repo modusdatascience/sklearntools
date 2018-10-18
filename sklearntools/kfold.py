@@ -51,7 +51,8 @@ class CrossValidatingEstimator(BaseDelegatingEstimator):
     def fit(self, X, y=None, sample_weight=None, exposure=None):
         # For later
         parallel = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
-                        pre_dispatch=self.pre_dispatch)
+                        pre_dispatch=self.pre_dispatch,
+                        max_nbytes=None)
         
         # Extract arguments
         fit_args = self._process_args(X=X, y=y, sample_weight=sample_weight,
@@ -73,11 +74,12 @@ class CrossValidatingEstimator(BaseDelegatingEstimator):
                 cv = check_cv(self.cv, classifier=is_classifier(self.estimator), **cv_args)
                 
         # Do the cross validation fits
-        print(valmap(lambda x: x.shape, fit_args))
-        cv_fits = parallel(delayed(_fit_and_predict)(clone(self.estimator), fit_args, train, test) for train, test in cv)
+#         print(valmap(lambda x: x.shape, fit_args))
+#         print('num_folds = %d' % self.cv.get_n_splits(X=X))
+        cv_fits = parallel(delayed(_fit_and_predict)(clone(self.estimator), fit_args, train, test, self.verbose) for train, test in cv)
         
         # Combine predictions from cv fits
-        prediction = np.empty_like(y)
+        prediction = np.empty_like(y) if y is not None else np.empty(shape=X.shape[0])
         for fit in cv_fits:
             safe_assign_subset(prediction, fit[2], fit[1])
         
@@ -155,11 +157,21 @@ class HybridCV(with_metaclass(ABCMeta, BaseCrossValidator)):
 def all_false_predicate(X, y=None, groups=None):
     return np.zeros(shape=X.shape[0], dtype=bool)
 
-def column_interval_predicate(colname, lower=-np.inf, upper=np.inf):
-    def _column_interval_predicate(X, y=None, groups=None):
-        z = np.ravel(X[colname])
-        return (z > upper) | (z < lower)
-    return _column_interval_predicate
+class column_interval_predicate(object):
+    def __init__(self, colname, lower=-np.inf, upper=np.inf):
+        self.colname = colname
+        self.lower = lower
+        self.upper = upper
+    
+    def __call__(self, X, y=None, groups=None):
+        z = np.ravel(X[self.colname])
+        return (z > self.upper) | (z < self.lower)
+
+# def column_interval_predicate(colname, lower=-np.inf, upper=np.inf):
+#     def _column_interval_predicate(X, y=None, groups=None):
+#         z = np.ravel(X[colname])
+#         return (z > upper) | (z < lower)
+#     return _column_interval_predicate
         
 class PredicateHybridCV(HybridCV):
     def __init__(self, n_folds, shuffle=True, predicate=all_false_predicate, **kwargs):
