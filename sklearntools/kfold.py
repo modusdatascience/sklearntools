@@ -123,8 +123,10 @@ class ThresholdStratifiedKFold(object):
     def get_n_splits(self, *args,  **kwargs):
         return self.stratified.get_n_splits(*args, **kwargs)
     
-    def split(self, X, y):
+    def split(self, X, y=None):
         if self.column is None:
+            if y is None:
+                raise ValueError('y argument required if column is None.')
             col = y
         else:
             col = safe_column_select(X, self.column)
