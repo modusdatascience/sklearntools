@@ -17,6 +17,7 @@ from _collections_abc import Iterable
 from six import with_metaclass
 from abc import ABCMeta, abstractmethod
 from toolz.curried import valmap
+from sklearntools.sklearntools import safe_column_select
 
 class CrossValidatingEstimator(BaseDelegatingEstimator):
     def __init__(self, estimator, metric=None, cv=2, n_jobs=1, verbose=0, 
@@ -111,7 +112,8 @@ def s2c_sym_predict_cross_validating_estimator(estimator):
     return s2c_sym_predict(estimator.estimator_)
 
 class ThresholdStratifiedKFold(object):
-    def __init__(self, thresholds, *args, **kwargs):
+    def __init__(self, thresholds, *args, column=None, **kwargs):
+        self.column = column
         if isinstance(thresholds, Iterable):
             self.thresholds = list(thresholds)
         else:
@@ -122,10 +124,14 @@ class ThresholdStratifiedKFold(object):
         return self.stratified.get_n_splits(*args, **kwargs)
     
     def split(self, X, y):
-        y_thresh = np.zeros(y.shape)
+        if self.column is None:
+            col = y
+        else:
+            col = safe_column_select(X, self.column)
+        col_thresh = np.zeros(col.shape)
         for thresh in self.thresholds:
-            y_thresh += y >= thresh
-        for train, test in self.stratified.split(X, y_thresh):
+            col_thresh += col >= thresh
+        for train, test in self.stratified.split(X, col_thresh):
             yield train, test
         
 class HybridCV(with_metaclass(ABCMeta, BaseCrossValidator)):
