@@ -1,4 +1,4 @@
-from sklearntools.sklearntools import STSimpleEstimator, growd
+from sklearntools.sklearntools import STSimpleEstimator, growd, shrinkd
 from sklearn2code.utility import tupify
 from sklearn.base import clone
 from sklearn.externals.joblib.parallel import Parallel
@@ -12,6 +12,40 @@ from sklearn2code.sym.function import VariableFactory, Function, cart
 from frozendict import frozendict
 from collections import OrderedDict
 from toolz.itertoolz import first
+import scipy.optimize
+from sklearn.exceptions import NotFittedError
+
+class NonNegativeLeastSquaresRegressor(STSimpleEstimator):
+    def __init__(self, normalize_coefs=True):
+        '''
+        normalize_coefs (bool): If True, coefficients will be normalized
+            to add up to 1.
+        '''
+        self.normalize_coefs = normalize_coefs
+    
+    def fit(self, X, y):
+        X = np.asarray_chkfinite(X)
+        y = shrinkd(1, np.asarray_chkfinite(y))
+        self.coefs_ = scipy.optimize.nnls(X, y)[0]
+        if self.normalize_coefs:
+            self.coefs_ /= np.sum(self.coefs_)
+        print('self.coefs_ = {}'.format(self.coefs_))
+        return self
+    
+    def predict(self, X):
+        if not hasattr(self, 'coefs_'):
+            raise NotFittedError()
+        return np.dot(X, self.coefs_)
+        
+def sort_rows_independently(arr, inplace=True):
+    '''
+    Sort each row of the 2d array arr.
+    '''
+    if not inplace:
+        arr = arr.copy()
+    for i in arr.shape[0]:
+        arr[i,:] = np.sort(arr[i,:], inplace=False)
+    return arr if not inplace else None
 
 class SuperLearner(STSimpleEstimator):
     def __init__(self, regressors, meta_regressor, y_transformer=None, cv=2, n_jobs=1, verbose=0, 
