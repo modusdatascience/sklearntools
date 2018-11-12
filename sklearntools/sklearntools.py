@@ -100,7 +100,7 @@ def growd(d, x):
     if l >= d:
         return x
     else:
-        slice_args = ([slice(None)] * l) + [None] * (d-l)
+        slice_args = tuple(([slice(None)] * l) + [None] * (d-l))
         return x.__getitem__(slice_args)
 
 @curry
@@ -123,7 +123,7 @@ def shrinkd(d, x):
             else:
                 hit = True
                 slice_args.append(slice(None))
-        return x.__getitem__(slice_args)
+        return x.__getitem__(tuple(slice_args))
 
 def safe_rows_select(data, rows):
     if hasattr(data, 'loc'):
