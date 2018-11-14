@@ -42,6 +42,24 @@ def test_memorization_fit_predict():
     assert_array_almost_equal(cv_pred, cv_pred2)
     assert_array_almost_equal(cv_pred, model2.estimator_.cv_predictions_)
 
+def test_memorization_with_model_differences():
+    memory_dir = 'test_memory_dir'
+    if os.path.exists(memory_dir):
+        rmtree(memory_dir)
+    try:
+        model = memorize(Memory(memory_dir, verbose=0), Earth())
+        X, y = make_regression()
+        model.fit(X, y)
+        assert not model.loaded_from_cache_
+        model2 = memorize(Memory(memory_dir, verbose=0), Earth(max_degree=2))
+        model2.fit(X, y)
+        assert not model2.loaded_from_cache_
+    finally:
+        if os.path.exists(memory_dir):
+            rmtree(memory_dir)
+    assert_array_almost_equal(model.predict(X), model2.predict(X))
+    
+    
 if __name__ == '__main__':
     import sys
     import nose
