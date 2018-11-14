@@ -12,6 +12,10 @@ from sklearn2code.utility import exec_module
 import pandas
 from numpy.ma.testutils import assert_array_almost_equal
 from toolz.itertoolz import first
+import os
+from shutil import rmtree
+from sklearn.datasets.samples_generator import make_regression
+from sklearn.externals.joblib import Memory
 
 def test_super_learner():
     np.random.seed(0)
@@ -40,6 +44,30 @@ def test_super_learner():
     
     print(max([r2_score(y, first(model.estimator_.cross_validating_estimators_.values()).cv_predictions_) for i in range(2)]))
 
+
+def test_super_learner_with_memory():
+    memory_dir = 'test_memory_dir'
+    if os.path.exists(memory_dir):
+        rmtree(memory_dir)
+    
+    X, y = load_boston(return_X_y=True)
+    try:
+        model = SuperLearner([('linear', LinearRegression()), ('earth', Earth(max_degree=2))],
+                         LinearRegression(), cv=5, n_jobs=1, memory=Memory(memory_dir, verbose=0))
+        model.fit(X, y)
+        
+        assert all([not est.loaded_from_cache_ for est in model.cross_validating_estimators_.values()])
+        
+        model2 = SuperLearner([('linear', LinearRegression()), ('earth', Earth(max_degree=2))],
+                         LinearRegression(), cv=5, n_jobs=1, memory=Memory(memory_dir, verbose=0))
+        
+        model2.fit(X, y)
+        assert all([est.loaded_from_cache_ for est in model2.cross_validating_estimators_.values()])
+        
+    finally:
+        if os.path.exists(memory_dir):
+            rmtree(memory_dir)
+        
 
 if __name__ == '__main__':
     import sys
