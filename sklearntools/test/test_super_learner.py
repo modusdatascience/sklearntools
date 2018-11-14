@@ -16,6 +16,7 @@ import os
 from shutil import rmtree
 from sklearn.datasets.samples_generator import make_regression
 from sklearn.externals.joblib import Memory
+from xgboost.sklearn import XGBRegressor
 
 def test_super_learner():
     np.random.seed(0)
@@ -63,6 +64,14 @@ def test_super_learner_with_memory():
         
         model2.fit(X, y)
         assert all([est.loaded_from_cache_ for est in model2.cross_validating_estimators_.values()])
+        
+        model3 = SuperLearner([('linear', LinearRegression()), ('earth', Earth(max_degree=2)), ('xgb', XGBRegressor())],
+                         LinearRegression(), cv=5, n_jobs=1, memory=Memory(memory_dir, verbose=0))
+        
+        model3.fit(X, y)
+        assert model3.cross_validating_estimators_['linear'].loaded_from_cache_
+        assert model3.cross_validating_estimators_['earth'].loaded_from_cache_
+        assert not model3.cross_validating_estimators_['xgb'].loaded_from_cache_
         
     finally:
         if os.path.exists(memory_dir):
