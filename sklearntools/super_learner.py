@@ -15,6 +15,7 @@ from toolz.itertoolz import first
 import scipy.optimize
 from sklearn.exceptions import NotFittedError
 from memorize import MemorizingEstimator, memorize
+import pandas
 
 class NonNegativeLeastSquaresRegressor(STSimpleEstimator):
     def __init__(self, normalize_coefs=True):
@@ -44,10 +45,24 @@ def sort_rows_independently(arr, inplace=True):
     '''
     if not inplace:
         arr = arr.copy()
-    for i in arr.shape[0]:
-        arr[i,:] = np.sort(arr[i,:], inplace=False)
+    for i in range(arr.shape[0]):
+        arr[i,:] = np.sort(arr[i,:])
     return arr if not inplace else None
 
+class OrderTransformer(STSimpleEstimator):
+    '''
+    Transform input data into row-wise order statistics.  That is, 
+    sort each row of the input matrix.
+    '''
+    def fit(self, X, y=None, sample_weight=None, exposure=None):
+        return self
+    
+    def transform(self, X):
+        result = sort_rows_independently(X, inplace=False)
+        result = pandas.DataFrame(result, columns=['O(%d/%d)'%(i+1, X.shape[1]) for i in range(X.shape[1])])
+        return result
+    
+    
 class SuperLearner(STSimpleEstimator):
     def __init__(self, regressors, meta_regressor, y_transformer=None, memory=None, cv=2, n_jobs=1, verbose=0, 
                  pre_dispatch='2*n_jobs'):

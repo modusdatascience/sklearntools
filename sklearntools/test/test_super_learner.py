@@ -1,5 +1,5 @@
 from sklearn.datasets.base import load_boston
-from sklearntools.super_learner import SuperLearner
+from sklearntools.super_learner import SuperLearner, OrderTransformer
 from sklearn.linear_model.base import LinearRegression
 from pyearth import Earth
 from sklearn.ensemble.forest import RandomForestRegressor
@@ -17,6 +17,7 @@ from shutil import rmtree
 from sklearn.datasets.samples_generator import make_regression
 from sklearn.externals.joblib import Memory
 from xgboost.sklearn import XGBRegressor
+from nose.tools import assert_equal
 
 def test_super_learner():
     np.random.seed(0)
@@ -77,7 +78,16 @@ def test_super_learner_with_memory():
         if os.path.exists(memory_dir):
             rmtree(memory_dir)
         
-
+def test_order_transformer():
+    X, y = load_boston(return_X_y=True)
+    model = OrderTransformer()
+    XX = X.copy()
+    model.fit(X, y)
+    O = model.transform(X)
+    for i in range(X.shape[0]):
+        assert_equal(set(XX[i,:]), set(O.iloc[i,:]))
+        assert_equal(list(O.iloc[i,:]), list(sorted(O.iloc[i,:])))
+    
 if __name__ == '__main__':
     import sys
     import nose
