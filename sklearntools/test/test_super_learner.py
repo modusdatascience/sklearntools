@@ -1,10 +1,12 @@
 from sklearn.datasets.base import load_boston
-from sklearntools.super_learner import SuperLearner, OrderTransformer
+from sklearntools.super_learner import SuperLearner, OrderTransformer,\
+    NonNegativeLeastSquaresRegressor
 from sklearn.linear_model.base import LinearRegression
 from pyearth import Earth
 from sklearn.ensemble.forest import RandomForestRegressor
 from sklearn.metrics.regression import r2_score
-from sklearntools.kfold import CrossValidatingEstimator
+from sklearntools.kfold import CrossValidatingEstimator,\
+    ThresholdStratifiedKFold
 import numpy as np
 from sklearn2code.sklearn2code import sklearn2code
 from sklearn2code.languages import numpy_flat
@@ -18,6 +20,8 @@ from sklearn.datasets.samples_generator import make_regression
 from sklearn.externals.joblib import Memory
 from xgboost.sklearn import XGBRegressor
 from nose.tools import assert_equal
+from sklearntools.transformers import Identity, TransformingEstimator,\
+    VariableTransformer
 
 def test_super_learner():
     np.random.seed(0)
@@ -45,7 +49,6 @@ def test_super_learner():
     print(r2_score(y, cv_pred))
     
     print(max([r2_score(y, first(model.estimator_.cross_validating_estimators_.values()).cv_predictions_) for i in range(2)]))
-
 
 def test_super_learner_with_memory():
     memory_dir = 'test_memory_dir'
@@ -87,7 +90,54 @@ def test_order_transformer():
     for i in range(X.shape[0]):
         assert_equal(set(XX[i,:]), set(O.iloc[i,:]))
         assert_equal(list(O.iloc[i,:]), list(sorted(O.iloc[i,:])))
+
+
+def test_memorization_with_complicated_model():
+    def identities(*args):
+        return {arg: Identity(arg) for arg in args}
     
+    def create_model(*inputs):
+        standard_model_inputs = inputs
+        return TransformingEstimator(
+            XGBRegressor(),
+            y_transformer = VariableTransformer(identities('x5'),
+                                                strict=True, exclusive=True),
+            x_transformer = VariableTransformer(identities(*standard_model_inputs),
+                                                strict=True, exclusive=True),
+            )
+    m = 1000
+    n = 10
+    X = np.random.normal(size=(m,n))
+    beta = np.random.normal(size=n)
+    beta[5] = 0.
+    X[:, 5] = np.random.normal(np.dot(X, beta))
+    X = pandas.DataFrame(X, columns=['x%d' % i for i in range(n)])
+    
+    memory_dir = 'test_memory_dir'
+    if os.path.exists(memory_dir):
+        rmtree(memory_dir)
+    try:
+        model1 = SuperLearner([('x1', create_model('x1')), ('x2-4', create_model('x2', 'x3', 'x4'))],
+                              NonNegativeLeastSquaresRegressor(normalize_coefs=False),
+                              y_transformer=VariableTransformer(identities('x5'),
+                                                strict=True, exclusive=True),
+                              memory=Memory(memory_dir, verbose=0)
+                              )
+        model1.fit(X)
+        assert all([not est.loaded_from_cache_ for est in model1.cross_validating_estimators_.values()])
+        model2 = SuperLearner([('x1', create_model('x1')), ('x2-4', create_model('x2', 'x3', 'x4'))],
+                              NonNegativeLeastSquaresRegressor(normalize_coefs=False),
+                              y_transformer=VariableTransformer(identities('x5'),
+                                                strict=True, exclusive=True),
+                              memory=Memory(memory_dir, verbose=0)
+                              )
+        model2.fit(X)
+        assert all([est.loaded_from_cache_ for est in model2.cross_validating_estimators_.values()])
+    finally:
+        if os.path.exists(memory_dir):
+            rmtree(memory_dir)
+
+
 if __name__ == '__main__':
     import sys
     import nose

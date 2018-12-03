@@ -54,6 +54,9 @@ class OrderTransformer(STSimpleEstimator):
     Transform input data into row-wise order statistics.  That is, 
     sort each row of the input matrix.
     '''
+    def __init__(self):
+        pass
+    
     def fit(self, X, y=None, sample_weight=None, exposure=None):
         return self
     

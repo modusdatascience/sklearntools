@@ -5,7 +5,13 @@ import os
 from sklearn.datasets.samples_generator import make_regression
 from shutil import rmtree
 from numpy.ma.testutils import assert_array_almost_equal
-from sklearntools.kfold import CrossValidatingEstimator
+from sklearntools.kfold import CrossValidatingEstimator,\
+    ThresholdStratifiedKFold
+from sklearntools.transformers import TransformingEstimator, VariableTransformer,\
+    Identity
+from xgboost.sklearn import XGBRegressor
+import numpy as np
+import pandas
 
 def test_memorization():
     memory_dir = 'test_memory_dir'
@@ -59,7 +65,40 @@ def test_memorization_with_model_differences():
             rmtree(memory_dir)
     assert_array_almost_equal(model.predict(X), model2.predict(X))
     
+def test_memorization_with_complicated_model():
+    def identities(*args):
+        return {arg: Identity(arg) for arg in args}
     
+    def create_model():
+        standard_model_inputs = ['x%d' % i for i in range(5)]
+        return CrossValidatingEstimator(TransformingEstimator(
+            XGBRegressor(),
+            y_transformer = VariableTransformer(identities('x5'),
+                                                strict=True, exclusive=True),
+            x_transformer = VariableTransformer(identities(*standard_model_inputs),
+                                                strict=True, exclusive=True),
+            ), cv=ThresholdStratifiedKFold(thresholds=1., n_splits=6, shuffle=True, column='x5'))
+    m = 1000
+    n = 10
+    X = np.random.normal(size=(m,n))
+    beta = np.random.normal(size=n)
+    X[:, 5] = np.random.normal(np.dot(X, beta))
+    X = pandas.DataFrame(X, columns=['x%d' % i for i in range(n)])
+    
+    memory_dir = 'test_memory_dir'
+    if os.path.exists(memory_dir):
+        rmtree(memory_dir)
+    try:
+        model1 = memorize(Memory(memory_dir, verbose=0), create_model())
+        model1.fit(X)
+        assert not model1.loaded_from_cache_
+        model2 = memorize(Memory(memory_dir, verbose=0), create_model())
+        model2.fit(X)
+        assert model2.loaded_from_cache_
+    finally:
+        if os.path.exists(memory_dir):
+            rmtree(memory_dir)
+
 if __name__ == '__main__':
     import sys
     import nose
