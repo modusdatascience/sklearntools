@@ -2,7 +2,7 @@ from .sklearntools import STSimpleEstimator, DelegatingEstimator, non_fit_method
     standard_methods, safe_col_select, safe_call, safe_column_names
 from sklearn.base import MetaEstimatorMixin, is_classifier, clone,\
     TransformerMixin
-from sklearn.cross_validation import check_cv
+from sklearn.model_selection import check_cv
 from sklearn.externals.joblib.parallel import Parallel, delayed
 import numpy as np
 from sklearn.utils.metaestimators import if_delegate_has_method

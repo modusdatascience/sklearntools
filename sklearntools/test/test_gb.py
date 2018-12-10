@@ -9,7 +9,7 @@ from sklearn.ensemble.gradient_boosting import GradientBoostingRegressor,\
     QuantileLossFunction, BinomialDeviance
 from sklearn.ensemble.bagging import BaggingRegressor
 from sklearn.metrics.regression import r2_score
-from sklearn.cross_validation import train_test_split
+from sklearn.model_selection import train_test_split
 from sklearn.exceptions import NotFittedError
 from sklearntools.sym.syms import syms
 from sklearntools.sym.printers import model_to_code, exec_module

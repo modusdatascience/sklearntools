@@ -1,6 +1,6 @@
 from sklearn.externals.joblib.parallel import Parallel, delayed
 from .calibration import no_cv
-from sklearn.cross_validation import check_cv
+from sklearn.model_selection import check_cv
 from sklearn.base import is_classifier, clone
 from .sklearntools import _fit_and_predict, non_fit_methods, BaseDelegatingEstimator, safe_assign_subset, safer_call
 import numpy as np
