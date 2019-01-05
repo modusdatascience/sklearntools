@@ -3,7 +3,6 @@ dependencies:
     - python=3.6.2
     - nose
     - numpy
-    - sympy
     - scikit-learn
     - six
     - pandas
@@ -11,6 +10,8 @@ dependencies:
     - mako
     - statsmodels
     - cython
+    - xgboost
+    - pyparsing
     - pip:
         - toolz
         - sklearn-contrib-py-earth

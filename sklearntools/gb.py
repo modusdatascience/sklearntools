@@ -12,10 +12,10 @@ from toolz.itertoolz import sliding_window
 from itertools import starmap
 from toolz.functoolz import flip, curry
 from sklearn.exceptions import NotFittedError
-from .sym.sym_predict import sym_predict
-from .sym.sym_score_to_decision import sym_score_to_decision
-from .sym.syms import syms
-from .sym.sym_score_to_proba import sym_score_to_proba
+# from .sym.sym_predict import sym_predict
+# from .sym.sym_score_to_decision import sym_score_to_decision
+# from .sym.syms import syms
+# from .sym.sym_score_to_proba import sym_score_to_proba
 from distutils.version import LooseVersion
 import sklearn
 from types import MethodType
@@ -354,16 +354,16 @@ class GradientBoostingEstimator(BaseDelegatingEstimator):
         else:
             return score
         
-    def sym_predict(self):
-        if not hasattr(self, 'estimator_'):
-            raise NotFittedError()
-        inner = sym_predict(self.estimator_)
-        if hasattr(self.loss_function, '_score_to_decision'):
-            outer = sym_score_to_decision(self.loss_function)
-            variable = syms(self.loss_function)[0]
-            return outer.subs({variable: inner})
-        else:
-            return inner
+#     def sym_predict(self):
+#         if not hasattr(self, 'estimator_'):
+#             raise NotFittedError()
+#         inner = sym_predict(self.estimator_)
+#         if hasattr(self.loss_function, '_score_to_decision'):
+#             outer = sym_score_to_decision(self.loss_function)
+#             variable = syms(self.loss_function)[0]
+#             return outer.subs({variable: inner})
+#         else:
+#             return inner
         
     def predict_proba(self, X, exposure=None):
         if not hasattr(self, 'estimator_'):
@@ -374,17 +374,17 @@ class GradientBoostingEstimator(BaseDelegatingEstimator):
             return self.loss_function._score_to_proba(score)
         else:
             raise AttributeError()
-    
-    def sym_predict_proba(self):
-        if not hasattr(self, 'estimator_'):
-            raise NotFittedError()
-        inner = sym_predict(self.estimator_)
-        if hasattr(self.loss_function, '_score_to_proba'):
-            outer = sym_score_to_proba(self.loss_function)
-            variable = syms(self.loss_function)[0]
-            return outer.subs({variable: inner})
-        else:
-            return inner
+#     
+#     def sym_predict_proba(self):
+#         if not hasattr(self, 'estimator_'):
+#             raise NotFittedError()
+#         inner = sym_predict(self.estimator_)
+#         if hasattr(self.loss_function, '_score_to_proba'):
+#             outer = sym_score_to_proba(self.loss_function)
+#             variable = syms(self.loss_function)[0]
+#             return outer.subs({variable: inner})
+#         else:
+#             return inner
     
     def decision_function(self, X, exposure=None):
         if not hasattr(self.loss_function, '_score_to_decision'):
@@ -395,12 +395,12 @@ class GradientBoostingEstimator(BaseDelegatingEstimator):
         score = self.estimator_.predict(**pred_args)
         return score
     
-    def sym_decision_function(self):
-        if not hasattr(self.loss_function, '_score_to_decision'):
-            raise AttributeError()
-        if not hasattr(self, 'estimator_'):
-            raise NotFittedError()
-        return sym_predict(self.estimator_)
+#     def sym_decision_function(self):
+#         if not hasattr(self.loss_function, '_score_to_decision'):
+#             raise AttributeError()
+#         if not hasattr(self, 'estimator_'):
+#             raise NotFittedError()
+#         return sym_predict(self.estimator_)
         
     
     @property

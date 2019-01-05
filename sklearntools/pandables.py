@@ -1,6 +1,5 @@
 from .sklearntools import STSimpleEstimator
 from sympy.core.symbol import Symbol
-from .sym.syms import syms_x, syms
 import numpy as np
 
 class Pandable(object):
@@ -25,14 +24,14 @@ class InputFixingTransformer(STSimpleEstimator, Pandable):
         self.exposure = exposure
         self.output_constructor = output_constructor
     
-    def syms(self):
-        try:
-            return [Symbol(predictor) for predictor in self.predictors_]
-        except TypeError:
-            return syms_x(self)
-        
-    def sym_transform(self):
-        return syms(self)
+#     def syms(self):
+#         try:
+#             return [Symbol(predictor) for predictor in self.predictors_]
+#         except TypeError:
+#             return syms_x(self)
+#         
+#     def sym_transform(self):
+#         return syms(self)
         
     def input_size(self):
         return len(self.predictors_)

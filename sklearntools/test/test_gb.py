@@ -11,8 +11,6 @@ from sklearn.ensemble.bagging import BaggingRegressor
 from sklearn.metrics.regression import r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.exceptions import NotFittedError
-from sklearntools.sym.syms import syms
-from sklearntools.sym.printers import model_to_code, exec_module
 import pandas
 from sklearn.datasets.samples_generator import make_classification
 from nose import SkipTest
@@ -50,17 +48,17 @@ def test_gradient_boosting_estimator_with_binomial_deviance_loss():
     assert_greater(np.sum(model.predict(X)==y) / float(y.shape[0]), .90)
     assert_true(np.all(0<=model.predict_proba(X)))
     assert_true(np.all(1>=model.predict_proba(X)))
-    symbols = syms(model)
-    X_ = pandas.DataFrame(X, columns=[s.name for s in symbols])
-    numpy_test_module = exec_module('numpy_test_module', model_to_code(model, 'numpy', 'predict', 'test_model'))
-    y_pred_ = numpy_test_module.test_model(**X_)
-    y_pred = model.predict(X)
-    assert_array_almost_equal(y_pred, y_pred_)
+#     symbols = syms(model)
+#     X_ = pandas.DataFrame(X, columns=[s.name for s in symbols])
+#     numpy_test_module = exec_module('numpy_test_module', model_to_code(model, 'numpy', 'predict', 'test_model'))
+#     y_pred_ = numpy_test_module.test_model(**X_)
+#     y_pred = model.predict(X)
+#     assert_array_almost_equal(y_pred, y_pred_)
     
-    numpy_test_module = exec_module('numpy_test_module', model_to_code(model, 'numpy', 'predict_proba', 'test_model'))
-    y_pred_ = numpy_test_module.test_model(**X_)
-    y_pred = model.predict_proba(X)[:,1]
-    assert_array_almost_equal(y_pred, y_pred_)
+#     numpy_test_module = exec_module('numpy_test_module', model_to_code(model, 'numpy', 'predict_proba', 'test_model'))
+#     y_pred_ = numpy_test_module.test_model(**X_)
+#     y_pred = model.predict_proba(X)[:,1]
+#     assert_array_almost_equal(y_pred, y_pred_)
 
 def test_with_calibrated_classifier():
     np.random.seed(0)
@@ -108,26 +106,26 @@ def test_gradient_boosting_estimator_with_smooth_quantile_loss():
     assert_greater(model.score_, 0.)
     assert_approx_equal(model.score(X_train, y_train), model.score_)
     
-def test_sym_predict():
-    np.random.seed(0)
-    m = 5000
-    n = 10
-    p = .8
-    X = np.random.normal(size=(m,n))
-    beta = np.random.normal(size=n)
-    mu = np.dot(X, beta)
-    y = np.random.lognormal(mu)
-    loss_function = SmoothQuantileLossFunction(1, p, .0001)
-    model = GradientBoostingEstimator(Earth(max_degree=1, verbose=False, use_fast=True, max_terms=10), 
-                                      loss_function, n_estimators=10)
-    model.fit(X, y)
-    symbols = syms(model)
-    X_ = pandas.DataFrame(X, columns=[s.name for s in symbols])
-    numpy_test_module = exec_module('numpy_test_module', model_to_code(model, 'numpy', 'predict', 'test_model'))
-    y_pred_ = numpy_test_module.test_model(**X_)
-    y_pred = model.predict(X)
-    assert_array_almost_equal(y_pred, y_pred_)
-    
+# def test_sym_predict():
+#     np.random.seed(0)
+#     m = 5000
+#     n = 10
+#     p = .8
+#     X = np.random.normal(size=(m,n))
+#     beta = np.random.normal(size=n)
+#     mu = np.dot(X, beta)
+#     y = np.random.lognormal(mu)
+#     loss_function = SmoothQuantileLossFunction(1, p, .0001)
+#     model = GradientBoostingEstimator(Earth(max_degree=1, verbose=False, use_fast=True, max_terms=10), 
+#                                       loss_function, n_estimators=10)
+#     model.fit(X, y)
+#     symbols = syms(model)
+#     X_ = pandas.DataFrame(X, columns=[s.name for s in symbols])
+#     numpy_test_module = exec_module('numpy_test_module', model_to_code(model, 'numpy', 'predict', 'test_model'))
+#     y_pred_ = numpy_test_module.test_model(**X_)
+#     y_pred = model.predict(X)
+#     assert_array_almost_equal(y_pred, y_pred_)
+#     
 if __name__ == '__main__':
     import sys
     import nose

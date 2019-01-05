@@ -7,7 +7,6 @@ from sympy.functions.elementary.piecewise import Piecewise
 from sympy.core.numbers import RealNumber, One, Zero
 import numpy as np
 from sympy import log as SymLog, Min as SymMin, Max as SymMax
-from .sym.base import NAN, Missing
 from sympy.core.relational import Eq
 from operator import __or__, methodcaller, __ge__
 from toolz.functoolz import curry, compose
@@ -370,11 +369,6 @@ class Censor(TwoArgumentColumnTransformation):
         safe_assign_subset(result, self.right.transform(X) != 0, np.nan)
         return result
     
-    def sym_transform(self, xlabels):
-        left = self.left.sym_transform(xlabels)
-        right = self.right.sym_transform(xlabels)
-        return Piecewise((NAN(1), Eq(right, One())), (left, True))
-
 @sym_col_trans.register(Censor)
 def sym_censor(estimator):
     left = sym_col_trans(estimator.left)
@@ -387,11 +381,6 @@ class Uncensor(TwoArgumentColumnTransformation):
         safe_assign_subset(result, np.isnan(result), self.right.transform(X))
         return result
     
-    def sym_transform(self, xlabels):
-        left = self.left.sym_transform(xlabels)
-        right = self.right.sym_transform(xlabels)
-        return Piecewise((right, Eq(Missing(left), One())), (left, True))
-
 @sym_col_trans.register(Uncensor)
 def sym_uncensor(estimator):
     left = sym_col_trans(estimator.left)

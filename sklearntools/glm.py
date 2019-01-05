@@ -190,7 +190,7 @@ class BinomialRegressor(GLMFamily):
 
 class GammaRegressor(GLMFamily):
     family = statsmodels.genmod.families.family.Gamma
-    args = (log,)
+    args = (log(),)
     
 class GaussianRegressor(GLMFamily):
     family = statsmodels.genmod.families.family.Gaussian
