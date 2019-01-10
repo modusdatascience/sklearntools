@@ -1,8 +1,9 @@
-from sklearntools.sklearntools import STSimpleEstimator, growd, shrinkd
+from .sklearntools import STSimpleEstimator, growd, shrinkd,\
+    safe_column_names
 from sklearn2code.utility import tupify
 from sklearn.base import clone
 from sklearn.externals.joblib.parallel import Parallel
-from sklearntools.kfold import CrossValidatingEstimator
+from .kfold import CrossValidatingEstimator
 import numpy as np
 from toolz.dicttoolz import assoc, get_in, keyfilter, valmap, dissoc
 from operator import __contains__
@@ -14,31 +15,45 @@ from collections import OrderedDict
 from toolz.itertoolz import first
 import scipy.optimize
 from sklearn.exceptions import NotFittedError
-from memorize import MemorizingEstimator, memorize
+from memorize import memorize
 import pandas
+from sklearn2code.sym.expression import RealVariable, Ordered
+from sklearn2code.sym.adapters.linear import sym_predict_linear
 
 class NonNegativeLeastSquaresRegressor(STSimpleEstimator):
-    def __init__(self, normalize_coefs=True):
+    def __init__(self, normalize_coefs=False):
         '''
         normalize_coefs (bool): If True, coefficients will be normalized
             to add up to 1.
         '''
         self.normalize_coefs = normalize_coefs
     
-    def fit(self, X, y):
+    def fit(self, X, y, xlabels=None):
+        if xlabels is not None:
+            self.xlabels_ = xlabels
+        else:
+            self.xlabels_ = safe_column_names(X)
         X = np.asarray_chkfinite(X)
         y = shrinkd(1, np.asarray_chkfinite(y))
-        self.coefs_ = scipy.optimize.nnls(X, y)[0]
+        self.coef_ = scipy.optimize.nnls(X, y)[0]
         if self.normalize_coefs:
-            self.coefs_ /= np.sum(self.coefs_)
-        print('self.coefs_ = {}'.format(self.coefs_))
+            self.coef_ /= np.sum(self.coef_)
+        print('self.coef_ = {}'.format(self.coef_))
         return self
     
     def predict(self, X):
-        if not hasattr(self, 'coefs_'):
+        if not hasattr(self, 'coef_'):
             raise NotFittedError()
-        return np.dot(X, self.coefs_)
-        
+        return np.dot(X, self.coef_)
+
+# @syms.register(NonNegativeLeastSquaresRegressor)
+# def syms_non_negative_least_squares_regressor(estimator):
+#     return tuple(map(RealVariable, estimator.xlabels_))
+
+@sym_predict.register(NonNegativeLeastSquaresRegressor)
+def sym_predict_negative_least_squares_regressor(estimator):
+    return sym_predict_linear(estimator)
+
 def sort_rows_independently(arr, inplace=True):
     '''
     Sort each row of the 2d array arr.
@@ -57,14 +72,25 @@ class OrderTransformer(STSimpleEstimator):
     def __init__(self):
         pass
     
-    def fit(self, X, y=None, sample_weight=None, exposure=None):
+    def fit(self, X, y=None, sample_weight=None, exposure=None, xlabels=None):
+        if xlabels is not None:
+            self.xlabels_ = xlabels
+        else:
+            self.xlabels_ = safe_column_names(X)
         return self
     
     def transform(self, X):
-        result = sort_rows_independently(X, inplace=False)
+        result = sort_rows_independently(np.asarray(X), inplace=False)
         result = pandas.DataFrame(result, columns=['O(%d/%d)'%(i+1, X.shape[1]) for i in range(X.shape[1])])
         return result
-    
+
+@sym_transform.register(OrderTransformer)
+def sym_predict_order_transformer(estimator):
+    inputs = syms(estimator)
+    inner_function = Function(inputs, tuple(), (Ordered(*inputs),))
+    Var = VariableFactory(existing=inputs)
+    outputs = tuple([Var() for _ in inputs])
+    return Function(inputs, ((outputs, (inner_function, inputs)),), outputs)
     
 class SuperLearner(STSimpleEstimator):
     def __init__(self, regressors, meta_regressor, y_transformer=None, memory=None, cv=2, n_jobs=1, verbose=0, 

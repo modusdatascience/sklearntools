@@ -146,8 +146,8 @@ class Constant(ColumnTransformation):
     def transform(self, X):
         return np.ones(shape=X.shape[0]) * self.value
     
-    def sym_transform(self, xlabels):
-        return RealNumber(self.value)
+#     def sym_transform(self, xlabels):
+#         return RealNumber(self.value)
 
 @sym_col_trans.register(Constant)
 def sym_constant(estimator):
@@ -163,8 +163,8 @@ class Identity(ColumnTransformation):
     def transform(self, X):
         return safe_column_select(X, self.column)
     
-    def sym_transform(self, xlabels):
-        return Symbol(clean_column_name(xlabels, self.column))
+#     def sym_transform(self, xlabels):
+#         return Symbol(clean_column_name(xlabels, self.column))
 
 @sym_col_trans.register(Identity)
 def sym_identity(estimator):
@@ -181,9 +181,9 @@ class Nonzero(OneArgumentColumnTransformation):
     def transform(self, X):
         return self.arg.transform(X) != 0
     
-    def sym_transform(self, xlabels):
-        arg = self.arg.sym_transform(xlabels)
-        return Piecewise((Zero(), Eq(arg, Zero())), (One(), True))
+#     def sym_transform(self, xlabels):
+#         arg = self.arg.sym_transform(xlabels)
+#         return Piecewise((Zero(), Eq(arg, Zero())), (One(), True))
 
 @sym_col_trans.register(Nonzero)
 def sym_nonzero(estimator):
@@ -193,9 +193,9 @@ class Log(OneArgumentColumnTransformation):
     def transform(self, X):
         return np.log(self.arg.transform(X))
     
-    def sym_transform(self, xlabels):
-        arg = self.arg.sym_transform(xlabels)
-        return SymLog(arg)
+#     def sym_transform(self, xlabels):
+#         arg = self.arg.sym_transform(xlabels)
+#         return SymLog(arg)
 
 @sym_col_trans.register(Log)
 def sym_log(estimator):
@@ -206,9 +206,9 @@ class Negative(OneArgumentColumnTransformation):
     def transform(self, X):
         return -self.arg.transform(X)
     
-    def sym_transform(self, xlabels):
-        arg = self.arg.sym_transform(xlabels)
-        return -arg
+#     def sym_transform(self, xlabels):
+#         arg = self.arg.sym_transform(xlabels)
+#         return -arg
 
 @sym_col_trans.register(Negative)
 def sym_negative(estimator):
@@ -226,10 +226,10 @@ class Min(TwoArgumentColumnTransformation):
     def transform(self, X):
         return np.amin(self.left.transform(X), self.right.transform(X))
     
-    def sym_transform(self, xlabels):
-        left = self.left.sym_transform(xlabels)
-        right = self.right.sym_transform(xlabels)
-        return SymMin(left, right)
+#     def sym_transform(self, xlabels):
+#         left = self.left.sym_transform(xlabels)
+#         right = self.right.sym_transform(xlabels)
+#         return SymMin(left, right)
 
 @sym_col_trans.register(Min)
 def sym_min(estimator):
@@ -239,10 +239,10 @@ class LT(TwoArgumentColumnTransformation):
     def transform(self, X):
         return self.left.transform(X) < self.right.transform(X)
     
-    def sym_transform(self, xlabels):
-        left = self.left.sym_transform(xlabels)
-        right = self.right.sym_transform(xlabels)
-        return Piecewise((One(), left<right), (Zero(), True))
+#     def sym_transform(self, xlabels):
+#         left = self.left.sym_transform(xlabels)
+#         right = self.right.sym_transform(xlabels)
+#         return Piecewise((One(), left<right), (Zero(), True))
 
 @sym_col_trans.register(LT)
 def sym_lt(estimator):
@@ -252,10 +252,10 @@ class LE(TwoArgumentColumnTransformation):
     def transform(self, X):
         return self.left.transform(X) <= self.right.transform(X)
     
-    def sym_transform(self, xlabels):
-        left = self.left.sym_transform(xlabels)
-        right = self.right.sym_transform(xlabels)
-        return Piecewise((One(), left<=right), (Zero(), True))
+#     def sym_transform(self, xlabels):
+#         left = self.left.sym_transform(xlabels)
+#         right = self.right.sym_transform(xlabels)
+#         return Piecewise((One(), left<=right), (Zero(), True))
 
 @sym_col_trans.register(LE)
 def sym_le(estimator):
@@ -265,10 +265,10 @@ class GT(TwoArgumentColumnTransformation):
     def transform(self, X):
         return self.left.transform(X) > self.right.transform(X)
     
-    def sym_transform(self, xlabels):
-        left = self.left.sym_transform(xlabels)
-        right = self.right.sym_transform(xlabels)
-        return Piecewise((One(), left>right), (Zero(), True))
+#     def sym_transform(self, xlabels):
+#         left = self.left.sym_transform(xlabels)
+#         right = self.right.sym_transform(xlabels)
+#         return Piecewise((One(), left>right), (Zero(), True))
 
 @sym_col_trans.register(GT)
 def sym_gt(estimator):
@@ -278,10 +278,10 @@ class GE(TwoArgumentColumnTransformation):
     def transform(self, X):
         return self.left.transform(X) >= self.right.transform(X)
     
-    def sym_transform(self, xlabels):
-        left = self.left.sym_transform(xlabels)
-        right = self.right.sym_transform(xlabels)
-        return Piecewise((One(), left>=right), (Zero(), True))
+#     def sym_transform(self, xlabels):
+#         left = self.left.sym_transform(xlabels)
+#         right = self.right.sym_transform(xlabels)
+#         return Piecewise((One(), left>=right), (Zero(), True))
 
 @sym_col_trans.register(GE)
 def sym_ge(estimator):
@@ -291,10 +291,10 @@ class Max(TwoArgumentColumnTransformation):
     def transform(self, X):
         return np.amax(self.left.transform(X), self.right.transform(X))
     
-    def sym_transform(self, xlabels):
-        left = self.left.sym_transform(xlabels)
-        right = self.right.sym_transform(xlabels)
-        return SymMax(left, right)
+#     def sym_transform(self, xlabels):
+#         left = self.left.sym_transform(xlabels)
+#         right = self.right.sym_transform(xlabels)
+#         return SymMax(left, right)
 
 @sym_col_trans.register(Max)
 def sym_max(estimator):
@@ -304,10 +304,10 @@ class Power(TwoArgumentColumnTransformation):
     def transform(self, X):
         return np.power(self.left.transform(X), self.right.transform(X))
     
-    def sym_transform(self, xlabels):
-        left = self.left.sym_transform(xlabels)
-        right = self.right.sym_transform(xlabels)
-        return left ** right#Piecewise((left**right, (left > 0)| (left < 0) | (right > 0)), (NAN(1), True))
+#     def sym_transform(self, xlabels):
+#         left = self.left.sym_transform(xlabels)
+#         right = self.right.sym_transform(xlabels)
+#         return left ** right#Piecewise((left**right, (left > 0)| (left < 0) | (right > 0)), (NAN(1), True))
 
 @sym_col_trans.register(Power)
 def sym_power(estimator):
@@ -317,10 +317,10 @@ class Sum(TwoArgumentColumnTransformation):
     def transform(self, X):
         return self.left.transform(X) + self.right.transform(X)
     
-    def sym_transform(self, xlabels):
-        left = self.left.sym_transform(xlabels)
-        right = self.right.sym_transform(xlabels)
-        return left + right
+#     def sym_transform(self, xlabels):
+#         left = self.left.sym_transform(xlabels)
+#         right = self.right.sym_transform(xlabels)
+#         return left + right
 
 @sym_col_trans.register(Sum)
 def sym_sum(estimator):
@@ -330,10 +330,10 @@ class Product(TwoArgumentColumnTransformation):
     def transform(self, X):
         return self.left.transform(X) * self.right.transform(X)
     
-    def sym_transform(self, xlabels):
-        left = self.left.sym_transform(xlabels)
-        right = self.right.sym_transform(xlabels)
-        return left * right
+#     def sym_transform(self, xlabels):
+#         left = self.left.sym_transform(xlabels)
+#         right = self.right.sym_transform(xlabels)
+#         return left * right
 
 @sym_col_trans.register(Product)
 def sym_product(estimator):
@@ -343,10 +343,10 @@ class Quotient(TwoArgumentColumnTransformation):
     def transform(self, X):
         return self.left.transform(X) / self.right.transform(X)
     
-    def sym_transform(self, xlabels):
-        left = self.left.sym_transform(xlabels)
-        right = self.right.sym_transform(xlabels)
-        return left / right
+#     def sym_transform(self, xlabels):
+#         left = self.left.sym_transform(xlabels)
+#         right = self.right.sym_transform(xlabels)
+#         return left / right
 
 @sym_col_trans.register(Quotient)
 def sym_quotient(estimator):
@@ -356,8 +356,8 @@ class Composition(TwoArgumentColumnTransformation):
     def transform(self, X):
         return self.left.transform(self.right.transform(X))
     
-    def sym_transform(self, xlabels):
-        return self.left.sym_transform(xlabels).subs({self.right.name: self.right.sym_transform(xlabels)})
+#     def sym_transform(self, xlabels):
+#         return self.left.sym_transform(xlabels).subs({self.right.name: self.right.sym_transform(xlabels)})
 
 @sym_col_trans.register(Composition)
 def sym_composition(estimator):
