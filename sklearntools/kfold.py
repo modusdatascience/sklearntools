@@ -53,7 +53,7 @@ class CrossValidatingEstimator(BaseDelegatingEstimator):
         # For later
         parallel = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
                         pre_dispatch=self.pre_dispatch,
-                        max_nbytes=None)
+                        )
         
         # Extract arguments
         fit_args = self._process_args(X=X, y=y, sample_weight=sample_weight,

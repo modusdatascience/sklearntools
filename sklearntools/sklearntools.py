@@ -147,7 +147,13 @@ def _subset(data, idx):
         return data[idx]
     else:
         if hasattr(data, 'iloc'):
-            return data.iloc[idx, :].reset_index(drop=True)
+            try:
+                return data.iloc[idx, :].reset_index(drop=True)
+            except ValueError as e:
+                if e.args[0] != "buffer source array is read-only":
+                    raise
+                else:
+                    return data.iloc[idx.copy(), :].reset_index(drop=True)
         else:
             return data[idx, :]
 
