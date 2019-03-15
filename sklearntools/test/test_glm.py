@@ -29,7 +29,7 @@ class TestGlm():
     
     def test_gamma(self):
         model = GammaRegressor()
-        y = Gamma(log).fitted(self.eta)
+        y = Gamma(log()).fitted(self.eta)
         model.fit(self.X, y)
         y_hat = model.predict(self.X)
         diff = y_hat - y

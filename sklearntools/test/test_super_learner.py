@@ -3,10 +3,8 @@ from sklearntools.super_learner import SuperLearner, OrderTransformer,\
     NonNegativeLeastSquaresRegressor
 from sklearn.linear_model.base import LinearRegression
 from pyearth import Earth
-from sklearn.ensemble.forest import RandomForestRegressor
 from sklearn.metrics.regression import r2_score
-from sklearntools.kfold import CrossValidatingEstimator,\
-    ThresholdStratifiedKFold
+from sklearntools.kfold import CrossValidatingEstimator
 import numpy as np
 from sklearn2code.sklearn2code import sklearn2code
 from sklearn2code.languages import numpy_flat
@@ -16,7 +14,6 @@ from numpy.ma.testutils import assert_array_almost_equal
 from toolz.itertoolz import first
 import os
 from shutil import rmtree
-from sklearn.datasets.samples_generator import make_regression
 from sklearn.externals.joblib import Memory
 from xgboost.sklearn import XGBRegressor
 from nose.tools import assert_equal
@@ -138,6 +135,45 @@ def test_memorization_with_complicated_model():
             rmtree(memory_dir)
 
 
+def test_non_negative_least_squares_regressor():
+    m = 1000
+    n = 10
+    X = np.random.normal(size=(m,n))
+    beta = np.random.uniform(0., 1., size=n)
+    y = np.random.normal(np.dot(X, beta))
+    X = pandas.DataFrame(X, columns=['x%d'%i for i in range(X.shape[1])])
+    
+    model = NonNegativeLeastSquaresRegressor(normalize_coefs=False)
+    model.fit(X, y)
+    
+    pred = model.predict(X)
+    code = sklearn2code(model, ['predict'], numpy_flat)
+    module = exec_module('module', code)
+    test_pred = module.predict(**X)
+    try:
+        assert_array_almost_equal(np.ravel(pred), np.ravel(test_pred))
+    except:
+        idx = np.abs(np.ravel(pred) - np.ravel(test_pred)) > .000001
+        print(np.ravel(pred)[idx])
+        print(np.ravel(test_pred)[idx])
+        raise
+
+def test_order_transformer_export():
+    m = 1000
+    n = 10
+    X = np.random.normal(size=(m,n))
+    X = pandas.DataFrame(X, columns=['x%d'%i for i in range(X.shape[1])])
+    
+    model = OrderTransformer()
+    model.fit(X)
+    trans = model.transform(X)
+    
+    code = sklearn2code(model, ['transform'], numpy_flat)
+    module = exec_module('module', code)
+    test_trans = np.array(module.transform(**X)).T
+    assert_array_almost_equal(trans, test_trans)
+
+    
 if __name__ == '__main__':
     import sys
     import nose

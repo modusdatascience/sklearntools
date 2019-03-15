@@ -21,6 +21,8 @@ from sympy.core.numbers import RealNumber
 from sympy.functions.elementary.miscellaneous import Max
 from .sklearntools import shrinkd
 from sklearn.isotonic import IsotonicRegression
+from distutils.version import LooseVersion
+import sklearn
 # from .sym.input_size import input_size
 
 # def _fit_and_predict(estimator, X, y, train, test, sample_weight=None, exposure=None):
@@ -366,7 +368,10 @@ class CalibratedEstimatorCV(STSimpleEstimator, MetaEstimatorMixin):
             if hasattr(self.cv, 'split'):
                 cv = self.cv.split(X, y)
             else:
-                cv = check_cv(self.cv, X=X, y=y, classifier=is_classifier(self.calibrator))
+                if LooseVersion(sklearn.__version__) < LooseVersion('0.20.0'):
+                    cv = check_cv(self.cv, classifier=is_classifier(self.estimator), y=y).split(X=X, y=y)
+                else:
+                    cv = check_cv(self.cv, classifier=is_classifier(self.estimator), X=X, y=y)
         parallel = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
                         pre_dispatch=self.pre_dispatch)
         
@@ -572,15 +577,22 @@ class ProbaPredictingEstimator(DelegatingEstimator):
     def __init__(self, estimator):
         self.estimator = estimator
     
-    def fit(self, X, y, *args, **kwargs):
+    def fit(self, X, y, sample_weight=None, exposure=None):
+        fit_args = self._process_args(X=X, y=y, sample_weight=sample_weight,
+                                      exposure=exposure)
         self.estimator_ = clone(self.estimator)
-        if len(y.shape) > 1 and y.shape[1] == 1:
-            y = np.ravel(y)
-        self.estimator_.fit(X, y, *args, **kwargs)
+        if len(fit_args['y'].shape) > 1 and fit_args['y'].shape[1] == 1:
+            fit_args['y'] = np.ravel(y)
+        try:
+            self.estimator_.fit(**fit_args)
+        except:
+            self.estimator_.fit(**fit_args)
         return self
     
-    def predict(self, X):
-        return safer_call(self.estimator_.predict_proba, X)[:, 1:]
+    def predict(self, X, exposure=None):
+        pred_args = self._process_args(X=X, 
+                                      exposure=exposure)
+        return safe_call(self.estimator_.predict_proba, pred_args)[:, 1:]
     
 #     def sym_transform(self):
 #         return sym_transform(self.estimator_)

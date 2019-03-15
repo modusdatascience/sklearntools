@@ -18,6 +18,8 @@ from six import with_metaclass
 from abc import ABCMeta, abstractmethod
 from toolz.curried import valmap
 from sklearntools.sklearntools import safe_column_select
+import sklearn
+from distutils.version import LooseVersion
 
 class CrossValidatingEstimator(BaseDelegatingEstimator):
     def __init__(self, estimator, metric=None, cv=2, n_jobs=1, verbose=0, 
@@ -70,9 +72,14 @@ class CrossValidatingEstimator(BaseDelegatingEstimator):
                 cv = self.cv.split(**cv_args)
             else:
                 cv_args = dict(X=X)
+                check_cv_args = dict()
                 if y is not None:
                     cv_args['y'] = shrinkd(1,np.asarray(y))
-                cv = check_cv(self.cv, classifier=is_classifier(self.estimator), **cv_args)
+                    check_cv_args['y'] = cv_args['y']
+                if LooseVersion(sklearn.__version__) < LooseVersion('0.20.0'):
+                    cv = check_cv(self.cv, classifier=is_classifier(self.estimator), **check_cv_args).split(**cv_args)
+                else:
+                    cv = check_cv(self.cv, classifier=is_classifier(self.estimator), **cv_args)
                 
         # Do the cross validation fits
 #         print(valmap(lambda x: x.shape, fit_args))
@@ -160,20 +167,22 @@ class HybridCV(with_metaclass(ABCMeta, BaseCrossValidator)):
         for result in self.base_kfold._iter_test_masks(X=X, y=y, groups=groups):
             result_ = (result & not_loo_mask)
             if np.any(result_!=0):
-                return result_
+                yield result_
     
 def all_false_predicate(X, y=None, groups=None):
     return np.zeros(shape=X.shape[0], dtype=bool)
 
 class column_interval_predicate(object):
-    def __init__(self, colname, lower=-np.inf, upper=np.inf):
+    def __init__(self, colname=None, lower=-np.inf, upper=np.inf):
         self.colname = colname
         self.lower = lower
         self.upper = upper
     
     def __call__(self, X, y=None, groups=None):
-        z = np.ravel(X[self.colname])
+        z = np.ravel(X[self.colname]) if self.colname is not None else y
         return (z > self.upper) | (z < self.lower)
+
+
 
 # def column_interval_predicate(colname, lower=-np.inf, upper=np.inf):
 #     def _column_interval_predicate(X, y=None, groups=None):
@@ -197,13 +206,13 @@ class ThresholdHybridCV(HybridCV):
         HybridCV.__init__(self, n_folds=n_folds, shuffle=shuffle, **kwargs)
         self.lower = lower
         self.upper = upper
-    
+     
     def get_n_splits(self, X, y, groups=None):
         return np.sum((y > self.upper) | (y < self.lower)) + self.n_folds
-    
+     
     def choose_loo(self, X, y, groups):
         return np.where((y > self.upper) | (y < self.lower))[0]
-    
+     
     
     
 

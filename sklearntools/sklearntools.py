@@ -438,10 +438,7 @@ class StagedEstimator(STEstimator, MetaEstimatorMixin):
     def predict(self, X, exposure=None):
         data = self._process_args(X=X, exposure=exposure)
         self._update(data)
-        try:
-            return safe_call(self.final_stage_.predict, data)
-        except:
-            return safe_call(self.final_stage_.predict, data)
+        return safe_call(self.final_stage_.predict, data)
         
     def predict_proba(self, X, exposure=None):
         data = self._process_args(X=X, exposure=exposure)

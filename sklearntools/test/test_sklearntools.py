@@ -29,6 +29,7 @@ from sklearntools.kfold import CrossValidatingEstimator
 from sklearn.metrics.regression import r2_score
 from sklearn.model_selection import KFold
 from nose.tools import assert_list_equal
+from statsmodels.genmod.families.links import log
 warnings.simplefilter("error")
 
 def test_safe_assign_column():
@@ -240,7 +241,7 @@ def test_hazard_to_risk():
     exposure = np.random.exponential(size=(m,1))
     rate = np.random.poisson(hazard * exposure) / exposure
     
-    model = CalibratedEstimatorCV(GLM(sm.families.Gaussian(sm.families.links.log), add_constant=False), 
+    model = CalibratedEstimatorCV(GLM(sm.families.Gaussian(log()), add_constant=False), 
                                   ProbaPredictingEstimator(ThresholdClassifier(HazardToRiskEstimator(LogisticRegression()))))
     
     model.fit(X, rate, exposure=exposure)
@@ -263,7 +264,7 @@ def test_hazard_to_risk_staged():
     exposure = np.random.exponential(size=(m,1))
     rate = np.random.poisson(hazard * exposure) / exposure
     
-    model = CalibratedEstimatorCV(GLM(sm.families.Gaussian(sm.families.links.log), add_constant=False), 
+    model = CalibratedEstimatorCV(GLM(sm.families.Gaussian(log()), add_constant=False), 
                                   ProbaPredictingEstimator(ThresholdClassifier(HazardToRiskEstimator(LogisticRegression()))))
     
     model.fit(X, rate, exposure=exposure)
@@ -286,7 +287,7 @@ def test_moving_average_smoothing_estimator():
     exposure = np.random.exponential(size=(m,1))
     rate = np.random.poisson(hazard * exposure) / exposure
     
-    model = CalibratedEstimatorCV(GLM(sm.families.Gaussian(sm.families.links.log), add_constant=False), 
+    model = CalibratedEstimatorCV(GLM(sm.families.Gaussian(log()), add_constant=False), 
                                   ThresholdClassifier(HazardToRiskEstimator(MovingAverageSmoothingEstimator(RandomForestRegressor()))))
     
     model.fit(X, rate, exposure=exposure)
@@ -383,7 +384,7 @@ def test_model_selector():
     best_subset = np.ravel(np.argsort(np.abs(beta))[::-1][:3])
     worst_subset = np.ravel(np.argsort(np.abs(beta))[:3])
     
-    basic_model = CalibratedEstimatorCV(GLM(sm.families.Gaussian(sm.families.links.log), add_constant=False), 
+    basic_model = CalibratedEstimatorCV(GLM(sm.families.Gaussian(log()), add_constant=False), 
                                   ProbaPredictingEstimator(ThresholdClassifier(HazardToRiskEstimator(LogisticRegression()))))
 
     model1 = CrossValidatingEstimator(ColumnSubsetTransformer(x_cols=best_subset) >> basic_model, metric=log_loss_metric)
