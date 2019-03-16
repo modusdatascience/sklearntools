@@ -21,7 +21,8 @@ def test_concatenating_estimator_transform():
     assert_array_equal(output.iloc[:,:n], data)
     assert_array_equal(output.iloc[:,n:], 
                        sort_rows_independently(np.asarray(data), inplace=False))
-    
+
+
 if __name__ == '__main__':
     import sys
     import nose
