@@ -54,6 +54,7 @@ class ConcatenatingEstimator(STSimpleEstimator):
                                                )
                                            )
                                        )
+        return self
     
     def predict(self, X, exposure=None):
         args = self._process_args(X=X, exposure=exposure)
