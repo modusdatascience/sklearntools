@@ -17,7 +17,7 @@ import scipy.optimize
 from sklearn.exceptions import NotFittedError
 from memorize import memorize
 import pandas
-from sklearn2code.sym.expression import RealVariable, Ordered
+from sklearn2code.sym.expression import RealVariable, Ordered, Tuple
 from sklearn2code.sym.adapters.linear import sym_predict_linear
 
 class NonNegativeLeastSquaresRegressor(STSimpleEstimator):
@@ -87,7 +87,7 @@ class OrderTransformer(STSimpleEstimator):
 @sym_transform.register(OrderTransformer)
 def sym_predict_order_transformer(estimator):
     inputs = syms(estimator)
-    inner_function = Function(inputs, tuple(), (Ordered(*inputs),))
+    inner_function = Function(inputs, tuple(), (Ordered(Tuple(*inputs)),))
     Var = VariableFactory(existing=inputs)
     outputs = tuple([Var() for _ in inputs])
     return Function(inputs, ((outputs, (inner_function, inputs)),), outputs)
