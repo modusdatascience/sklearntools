@@ -17,7 +17,7 @@ from sklearn2code.dispatching import call_method_or_dispatch
 from sklearn2code.sym.expression import RealNumber as S2CRealNumber,\
     RealVariable, RealPiecewise, true, Log as S2CLog, MinReal, LessReal,\
     LessEqualReal, GreaterReal, GreaterEqualReal, MaxReal, nan,\
-    IsNan
+    IsNan, Equals
 from sklearn2code.sym.function import Function
 from _collections import defaultdict
 from sklearn.base import clone
@@ -95,6 +95,16 @@ class ColumnTransformation(object):
         if not isinstance(other, ColumnTransformation):
             other = Constant(other)
         return other ** self
+    
+    def __eq__(self, other):
+        if not isinstance(other, ColumnTransformation):
+            other = Constant(other)
+        return EQ(self, other)
+    
+    def __req__(self, other):
+        if not isinstance(other, ColumnTransformation):
+            other = Constant(other)
+        return EQ(other, self)
     
     def __lt__(self, other):
         if not isinstance(other, ColumnTransformation):
@@ -220,7 +230,10 @@ class TwoArgumentColumnTransformation(ColumnTransformation):
         self.right = right
     
     def inputs(self):
-        return self.left.inputs() | self.right.inputs()
+        try:
+            return self.left.inputs() | self.right.inputs()
+        except:
+            return self.left.inputs() | self.right.inputs()
 
 class Min(TwoArgumentColumnTransformation):
     def transform(self, X):
@@ -234,6 +247,14 @@ class Min(TwoArgumentColumnTransformation):
 @sym_col_trans.register(Min)
 def sym_min(estimator):
     return MinReal(sym_col_trans(estimator.left), sym_col_trans(estimator.right))
+
+class EQ(TwoArgumentColumnTransformation):
+    def transform(self, X):
+        return self.left.transform(X) == self.right.transform(X)
+
+@sym_col_trans.register(EQ)
+def sym_eq(estimator):
+    return Equals(sym_col_trans(estimator.left), sym_col_trans(estimator.right))
 
 class LT(TwoArgumentColumnTransformation):
     def transform(self, X):
@@ -440,13 +461,19 @@ class VariableTransformer(STSimpleEstimator):
 
 class TransformingEstimator(STSimpleEstimator):
     def __init__(self, estimator, x_transformer=None, y_transformer=None, 
-                 exposure_transformer=None, weight_transformer=None):
+                 exposure_transformer=None, weight_transformer=None,
+                 prediction_multiplier_transformer=None):
+        '''
+        prediction_multiplier_transformer: A transformer that must return a multiplier for the 
+            prediction.  Generally used to add conditional nan masks or zero masks.
+        '''
         self.estimator = estimator
         self.x_transformer = x_transformer
         self.y_transformer = y_transformer
         self.exposure_transformer = exposure_transformer
         self.weight_transformer = weight_transformer
-    
+        self.prediction_multiplier_transformer = prediction_multiplier_transformer
+        
     def inputs(self):
         return self.x_transformer.inputs()
     
@@ -477,6 +504,8 @@ class TransformingEstimator(STSimpleEstimator):
             self.exposure_transformer_ = clone(self.exposure_transformer).fit(X)
         if self.weight_transformer is not None:
             self.weight_transformer_ = clone(self.weight_transformer).fit(X)
+        if self.prediction_multiplier_transformer is not None:
+            self.prediction_multiplier_transformer_ = clone(self.prediction_multiplier_transformer).fit(X)
         args = self._internal_transform(X, True)
         try:
             self.estimator_ = clone(self.estimator).fit(**args)
@@ -490,7 +519,10 @@ class TransformingEstimator(STSimpleEstimator):
     
     def predict(self, X):
         args = self._internal_transform(X, False)
-        return predict(self.estimator_, **args)
+        result = predict(self.estimator_, **args)
+        if self.prediction_multiplier_transformer is not None:
+            result *= self.prediction_multiplier_transformer_.transform(X)
+        return result
 #         try:
 #             return self.estimator_.predict(**args)
 #         except:
@@ -518,9 +550,12 @@ def sym_transform_transforming_estimator(estimator):
 @s2c_sym_predict.register(TransformingEstimator)
 def sym_predict_tranforming_estimator(estimator):
     if estimator.x_transformer is None:
-        return s2c_sym_predict(estimator.estimator_)
+        result = s2c_sym_predict(estimator.estimator_)
     else:
-        return s2c_sym_predict(estimator.estimator_).compose(s2c_sym_transform(estimator.x_transformer_))
+        result = s2c_sym_predict(estimator.estimator_).compose(s2c_sym_transform(estimator.x_transformer_))
+    if estimator.prediction_multiplier_transformer is not None:
+        result = s2c_sym_transform(estimator.prediction_multiplier_transformer_) * result
+    return result
 
 @s2c_sym_predict_proba.register(TransformingEstimator)
 def sym_predict_proba_tranforming_estimator(estimator):

@@ -37,7 +37,6 @@ class ConcatenatingEstimator(STSimpleEstimator):
     def __init__(self, estimators):
         self.estimators = tuple(estimators)
         self.ordered_estimators = OrderedDict(self.estimators.items() if hasattr(self.estimators, 'items') else self.estimators)
-
     
     def fit(self, X, y=None, sample_weight=None, exposure=None):
         fit_args = self._process_args(X=X, y=y, sample_weight=sample_weight,
