@@ -387,14 +387,14 @@ def sym_composition(estimator):
 class Censor(TwoArgumentColumnTransformation):
     def transform(self, X):
         result = self.left.transform(X).copy()
-        safe_assign_subset(result, self.right.transform(X) != 0, np.nan)
+        safe_assign_subset(result, self.right.transform(X), np.nan)
         return result
     
 @sym_col_trans.register(Censor)
 def sym_censor(estimator):
     left = sym_col_trans(estimator.left)
     right = sym_col_trans(estimator.right)
-    return RealPiecewise((nan, right.e == S2CRealNumber(1)), (left, true))
+    return RealPiecewise((nan, right), (left, true))
 
 class Uncensor(TwoArgumentColumnTransformation):
     def transform(self, X):
@@ -554,7 +554,11 @@ def sym_predict_tranforming_estimator(estimator):
     else:
         result = s2c_sym_predict(estimator.estimator_).compose(s2c_sym_transform(estimator.x_transformer_))
     if estimator.prediction_multiplier_transformer is not None:
-        result = s2c_sym_transform(estimator.prediction_multiplier_transformer_) * result
+        multiplier = s2c_sym_transform(estimator.prediction_multiplier_transformer_)
+        # The multiplier and the result may capture input variable names differently.  For example,
+        # one may be from sklearntools and one from scikit-learn.  Take the multiplier I guess.
+        result = result.map_symbols(dict(zip(result.inputs, multiplier.inputs)))
+        result *= s2c_sym_transform(estimator.prediction_multiplier_transformer_)
     return result
 
 @s2c_sym_predict_proba.register(TransformingEstimator)
@@ -575,10 +579,9 @@ def sym_transform_variable_transformer(estimator):
     for i, label in enumerate(estimator.xlabels_):
         label_to_idxs[label].append(i)
     
-    label_to_expr = dict(map(lambda label: (label, RealVariable(label)), estimator.xlabels_))
-    label_to_expr.update(estimator.clean_transformations_)
-    
-    outputs = list(inputs)
+    outputs = []
+    if not estimator.exclusive:
+        outputs += inputs
     for label, expr in estimator.clean_transformations_.items():
         if label in label_to_idxs:
             idxs = label_to_idxs[label]

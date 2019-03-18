@@ -8,6 +8,9 @@ from pyearth.earth import Earth
 from sklearntools.calibration import ResponseTransformingEstimator
 from sklearn.metrics.regression import r2_score
 from sklearn.linear_model.base import LinearRegression
+from sklearn2code.sklearn2code import sklearn2code
+from sklearn2code.renderers import numpy_flat
+from sklearn2code.utility import exec_module
 # from sklearntools.sym.printers import exec_module, model_to_code
 
 def test_with_response_transformation():
@@ -68,6 +71,10 @@ def test_prediction_multiplier_transformer():
     assert_array_almost_equal(model.estimator_.predict(X)[np.where(~np.isnan(pred))],
                               pred[~np.isnan(pred)])
     
+    code = sklearn2code(model, ['predict'], numpy_flat)
+    module = exec_module('module', code)
+    test_pred = module.predict(**X)
+    assert_array_almost_equal(np.ravel(pred), test_pred)
     
                                                                                           
     
