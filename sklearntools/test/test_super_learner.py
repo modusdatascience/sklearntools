@@ -7,7 +7,6 @@ from sklearn.metrics.regression import r2_score
 from sklearntools.kfold import CrossValidatingEstimator
 import numpy as np
 from sklearn2code.sklearn2code import sklearn2code
-from sklearn2code.languages import numpy_flat
 from sklearn2code.utility import exec_module
 import pandas
 from numpy.ma.testutils import assert_array_almost_equal
@@ -19,6 +18,7 @@ from xgboost.sklearn import XGBRegressor
 from nose.tools import assert_equal
 from sklearntools.transformers import Identity, TransformingEstimator,\
     VariableTransformer
+from sklearn2code.renderers import numpy_flat
 
 def test_super_learner():
     np.random.seed(0)
@@ -158,6 +158,7 @@ def test_non_negative_least_squares_regressor():
         print(np.ravel(test_pred)[idx])
         raise
 
+
 def test_order_transformer_export():
     m = 1000
     n = 10
@@ -170,7 +171,7 @@ def test_order_transformer_export():
     
     code = sklearn2code(model, ['transform'], numpy_flat)
     module = exec_module('module', code)
-    test_trans = np.array(module.transform(**X)).T
+    test_trans = np.stack(module.transform(**X), 1)
     assert_array_almost_equal(trans, test_trans)
 
     

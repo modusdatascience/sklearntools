@@ -170,7 +170,7 @@ def safe_assign_subset(arr, idx, value):
         try:
             arr[idx, :] = value.reshape(arr[idx, :].shape)
         except:
-            arr.flat[idx] = value
+            arr.flat[np.ravel(idx)] = value
     except IndexingError:
         arr[idx] = value
         
