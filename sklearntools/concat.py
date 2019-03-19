@@ -7,23 +7,30 @@ import numpy as np
 from collections import OrderedDict
 from six.moves import reduce
 
-def best_type(types, arg, *args):
-    while not isinstance(arg, types[-1]):
-        types.pop()
-        if not types:
-            raise TypeError('No best type found.')
-    if not args:
-        return types[-1]
-    return best_type(types, *args)
+# def best_type(types, arg, *args):
+#     while not isinstance(arg, types[-1]):
+#         types.pop()
+#         if not types:
+#             raise TypeError('No best type found.')
+#     if not args:
+#         return types[-1]
+#     return best_type(types, *args)
         
 def safe_concat(*args):
-    try:
-        return_type = best_type(
-                                [np.ndarray, pandas.DataFrame],
-                                *args
-                                )
-    except TypeError:
+    types = set(map(type, args))
+    if not types <= {np.ndarray, pandas.DataFrame}:
         raise TypeError('Inputs must be either pandas DataFrames or numpy ndarrays.')
+    if np.ndarray in types:
+        return_type = np.ndarray
+    else:
+        return_type = pandas.DataFrame
+#     try:
+#         return_type = best_type(
+#                                 [np.ndarray, pandas.DataFrame],
+#                                 *args
+#                                 )
+#     except TypeError:
+#         raise TypeError('Inputs must be either pandas DataFrames or numpy ndarrays.')
     if return_type is np.ndarray:
         return np.concatenate(tuple(map(growd(2), args)), axis=1)
     else:
