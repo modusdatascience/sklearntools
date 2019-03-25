@@ -19,6 +19,7 @@ from memorize import memorize
 import pandas
 from sklearn2code.sym.expression import RealVariable, Ordered, Tuple
 from sklearn2code.sym.adapters.linear import sym_predict_linear
+from pprint import pprint
 
 class NonNegativeLeastSquaresRegressor(STSimpleEstimator):
     def __init__(self, normalize_coefs=False):
@@ -38,7 +39,9 @@ class NonNegativeLeastSquaresRegressor(STSimpleEstimator):
         self.coef_ = scipy.optimize.nnls(X, y)[0]
         if self.normalize_coefs:
             self.coef_ /= np.sum(self.coef_)
-        print('self.coef_ = {}'.format(self.coef_))
+#         print('self.coef_ = {}'.format(self.coef_))
+        self.labeled_coefs_ = dict(zip(self.xlabels_, self.coef_))
+        pprint(self.labeled_coefs_)
         return self
     
     def predict(self, X):
@@ -171,9 +174,13 @@ class SuperLearner(STSimpleEstimator):
         # Fit y_transformer if necessary and construct the fitting arguments for the 
         # meta-regressor.
         meta_fit_args = assoc(fit_args, 'X', 
+                              pandas.DataFrame(
                               np.concatenate(tuple(map(growd(2), 
                                                        [self._get_cv_predictions(est) for est in 
-                                                        self.cross_validating_estimators_.values()])), axis=1))
+                                                        self.cross_validating_estimators_.values()])), axis=1),
+                              columns = list(self.cross_validating_estimators_.keys())
+                              )
+                              )
         if self.y_transformer is not None:
             self.y_transformer_ = clone(self.y_transformer).fit(**fit_args)
             meta_fit_args = assoc(meta_fit_args, 'y',
